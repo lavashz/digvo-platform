@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: digvo_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: digvo_user
+      POSTGRES_PASSWORD: digvo_secret_password
+      POSTGRES_DB: digvo_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - digvo_pgdata:/var/lib/postgresql/data
+
+volumes:
+  digvo_pgdata:
