@@ -81,7 +81,68 @@ def resolve_delivery_distance_km(org, payload: BookingCreate) -> float | None:
     )
 
 
-def find_available_operator(db: Session, machine: Machine, start_time: datetime, end_time: datetime) -> OperatorProfile | None:
+def _week_window(start_time: datetime) -> tuple[datetime, datetime]:
+    local = start_time
+    week_start = (local - timedelta(days=local.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return week_start, week_start + timedelta(days=7)
+
+
+def operator_week_load_hours(
+    db: Session, operator_id, start_time: datetime
+) -> float:
+    week_start, week_end = _week_window(start_time)
+    bookings = db.execute(
+        select(Booking).where(
+            Booking.operator_id == operator_id,
+            Booking.status != BookingStatus.CANCELLED,
+            Booking.start_time < week_end,
+            Booking.end_time > week_start,
+        )
+    ).scalars().all()
+    total = 0.0
+    for b in bookings:
+        total += (b.end_time - b.start_time).total_seconds() / 3600.0
+    return round(total, 2)
+
+
+def score_operator(
+    db: Session,
+    op: OperatorProfile,
+    machine: Machine,
+    start_time: datetime,
+    end_time: datetime,
+) -> float:
+    """
+    Wyższa punktacja = lepszy wybór.
+    - mniej godzin w tygodniu (balans obciążenia)
+    - dłuższa ważność uprawnienia do tej maszyny
+    - lekko niższa stawka godzinowa
+    """
+    load_h = operator_week_load_hours(db, op.user_id, start_time)
+    load_score = max(0.0, 40.0 - load_h)
+
+    qual = db.execute(
+        select(OperatorQualification).where(
+            OperatorQualification.operator_id == op.user_id,
+            OperatorQualification.qualification_id == machine.required_qualification_id,
+        )
+    ).scalars().first()
+    days_left = 0
+    if qual and qual.valid_until:
+        days_left = max(0, (qual.valid_until - end_time.date()).days)
+    qual_score = min(30.0, days_left / 30.0)  # max 30 pkt (~2.5 roku)
+
+    rate = float(op.hourly_rate_net)
+    rate_score = max(0.0, 30.0 - (rate / 5.0))  # tańszy lekko wyżej
+
+    return round(load_score + qual_score + rate_score, 2)
+
+
+def find_available_operator(
+    db: Session, machine: Machine, start_time: datetime, end_time: datetime
+) -> OperatorProfile | None:
     qualified_ops = db.execute(
         select(OperatorProfile)
         .join(OperatorQualification)
@@ -89,9 +150,12 @@ def find_available_operator(db: Session, machine: Machine, start_time: datetime,
             OperatorProfile.organization_id == machine.organization_id,
             OperatorProfile.is_active == True,
             OperatorQualification.qualification_id == machine.required_qualification_id,
-            OperatorQualification.valid_until >= end_time.date()
+            OperatorQualification.valid_until >= end_time.date(),
         )
     ).scalars().all()
+
+    best: OperatorProfile | None = None
+    best_score = -1.0
 
     for op in qualified_ops:
         op_busy = db.execute(
@@ -99,7 +163,7 @@ def find_available_operator(db: Session, machine: Machine, start_time: datetime,
                 Booking.operator_id == op.user_id,
                 Booking.status != BookingStatus.CANCELLED,
                 Booking.start_time < end_time,
-                Booking.end_time > start_time
+                Booking.end_time > start_time,
             ).limit(1)
         ).scalars().first()
 
@@ -107,13 +171,19 @@ def find_available_operator(db: Session, machine: Machine, start_time: datetime,
             select(UnavailabilityBlock).where(
                 UnavailabilityBlock.operator_id == op.user_id,
                 UnavailabilityBlock.start_time < end_time,
-                UnavailabilityBlock.end_time > start_time
+                UnavailabilityBlock.end_time > start_time,
             ).limit(1)
         ).scalars().first()
 
-        if not op_busy and not op_blocked:
-            return op
-    return None
+        if op_busy or op_blocked:
+            continue
+
+        score = score_operator(db, op, machine, start_time, end_time)
+        if score > best_score:
+            best_score = score
+            best = op
+
+    return best
 
 
 def find_available_transport(
@@ -310,6 +380,19 @@ def quote_booking(payload: BookingCreate, db: Session = Depends(get_db)):
     total_net = (machine_cost + operator_cost + transport_cost).quantize(Decimal("0.01"))
     total_gross = (total_net * Decimal("1.23")).quantize(Decimal("0.01"))
 
+    assigned_operator_name = None
+    operator_selection_score = None
+    operator_week_load = None
+    if assigned_op is not None:
+        op_user = db.get(User, assigned_op.user_id)
+        assigned_operator_name = op_user.full_name if op_user else None
+        operator_selection_score = score_operator(
+            db, assigned_op, machine, payload.start_time, payload.end_time
+        )
+        operator_week_load = operator_week_load_hours(
+            db, assigned_op.user_id, payload.start_time
+        )
+
     return BookingQuoteResponse(
         hours=float(total_hours),
         days=int(rental_days),
@@ -324,6 +407,9 @@ def quote_booking(payload: BookingCreate, db: Session = Depends(get_db)):
         deposit_amount=machine.deposit_amount,
         available=unavailable_reason is None,
         unavailable_reason=unavailable_reason,
+        assigned_operator_name=assigned_operator_name,
+        operator_selection_score=operator_selection_score,
+        operator_week_load_hours=operator_week_load,
     )
 
 

@@ -47,6 +47,9 @@ interface BookingQuote {
   deposit_amount: number;
   available: boolean;
   unavailable_reason: string | null;
+  assigned_operator_name: string | null;
+  operator_selection_score: number | null;
+  operator_week_load_hours: number | null;
 }
 
 interface SitePreset {
@@ -1378,7 +1381,7 @@ useEffect(() => {
                             </div>
                             <div className="flex justify-between text-zinc-400">
                               <span>
-                                {t(locale, "operatorFee")} ({estimate.hours} {t(locale, "hoursShort")})
+                                {t(locale, "operatorFee")} ({Number(estimate.hours).toFixed(1)} {t(locale, "hoursShort")})
                               </span>
                               <span className="text-zinc-200 tabular-nums">{money(estimate.operatorCost)}</span>
                             </div>
@@ -1420,6 +1423,23 @@ useEffect(() => {
                                   <>
                                     {" · "}
                                     {t(locale, "transportBuffer")}: {quote.transport_buffer_hours} h
+                                  </>
+                                )}
+                              </p>
+                            )}
+                            {withOperator && quote?.assigned_operator_name && (
+                              <p className="text-[11px] text-zinc-500">
+                                {t(locale, "assignedOperator")}: {quote.assigned_operator_name}
+                                {quote.operator_selection_score != null && (
+                                  <>
+                                    {" · "}
+                                    {t(locale, "operatorScore")}: {quote.operator_selection_score}
+                                  </>
+                                )}
+                                {quote.operator_week_load_hours != null && (
+                                  <>
+                                    {" · "}
+                                    {t(locale, "operatorWeekLoad")}: {quote.operator_week_load_hours} h
                                   </>
                                 )}
                               </p>

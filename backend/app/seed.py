@@ -168,6 +168,33 @@ def run_seed():
             phone="+48 500 300 400",
             role=UserRole.OPERATOR,
         )
+        op1b_user = get_or_create_user(
+            db,
+            email="a.wisniewska@kujawy-maszyny.pl",
+            organization_id=kujawy.id,
+            password_hash="hashed_secret_123",
+            full_name="Anna Wiśniewska",
+            phone="+48 500 300 401",
+            role=UserRole.OPERATOR,
+        )
+        if not db.execute(select(OperatorProfile).where(OperatorProfile.user_id == op1b_user.id)).scalar_one_or_none():
+            db.add(OperatorProfile(
+                user_id=op1b_user.id,
+                organization_id=kujawy.id,
+                hourly_rate_net=Decimal("70.00"),
+                is_active=True,
+            ))
+            db.flush()
+            db.add_all([
+                OperatorQualification(operator_id=op1b_user.id, qualification_id=q_koparka_1.id, valid_until=date(2027, 3, 31)),
+                OperatorQualification(operator_id=op1b_user.id, qualification_id=q_koparko_lad.id, valid_until=date(2027, 3, 31)),
+            ])
+        else:
+            op1b = db.get(OperatorProfile, op1b_user.id)
+            if op1b:
+                op1b.organization_id = kujawy.id
+                op1b.hourly_rate_net = Decimal("70.00")
+                
         op2_user = get_or_create_user(
             db,
             email="p.nowak@terrarent-bydgoszcz.pl",

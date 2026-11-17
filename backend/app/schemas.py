@@ -48,6 +48,9 @@ class BookingQuoteResponse(BaseModel):
     deposit_amount: Decimal
     available: bool = True
     unavailable_reason: str | None = None
+    assigned_operator_name: str | None = None
+    operator_selection_score: float | None = None
+    operator_week_load_hours: float | None = None
 
 
 class BookingStatusUpdate(BaseModel):

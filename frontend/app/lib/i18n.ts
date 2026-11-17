@@ -41,6 +41,9 @@ const dict = {
     occupied: "Termin zajęty — sprawdź inny dzień",
     day: "doba",
     hoursShort: "h",
+    assignedOperator: "Przypisany operator (algorytm punktacji)",
+    operatorScore: "Punktacja",
+    operatorWeekLoad: "Obciążenie w tygodniu",
   },
   en: {
     marketplace: "Marketplace",
@@ -81,6 +84,9 @@ const dict = {
     occupied: "Slot taken — try another day",
     day: "day",
     hoursShort: "h",
+    assignedOperator: "Assigned operator (scoring algorithm)",
+    operatorScore: "Score",
+    operatorWeekLoad: "Weekly load",
   },
 } as const;
 
