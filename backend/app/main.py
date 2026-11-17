@@ -8,10 +8,10 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import (
-    User, UserRole, Machine, OperatorProfile, Organization,
+    User, UserRole, Machine, OperatorProfile,
     OperatorQualification, Booking, BookingStatus,
     UnavailabilityBlock, HandoverProtocol, Qualification
 )
@@ -26,15 +26,6 @@ app = FastAPI(
     description="System rezerwacji sprzętu budowlanego, operatorów i logistyki transportu",
     version="1.0.0"
 )
-
-
-@app.on_event("startup")
-def on_startup():
-    try:
-        from app.seed import ensure_schema
-        ensure_schema()
-    except Exception as exc:
-        print(f"[startup] ensure_schema: {exc}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,46 +67,26 @@ def find_available_operator(db: Session, machine: Machine, start_time: datetime,
     ).scalars().all()
 
     for op in qualified_ops:
-        # .first() zamiast scalar_one_or_none — przy >1 nakładającym się rekordzie unika 500
         op_busy = db.execute(
             select(Booking).where(
                 Booking.operator_id == op.user_id,
                 Booking.status != BookingStatus.CANCELLED,
                 Booking.start_time < end_time,
                 Booking.end_time > start_time
-            ).limit(1)
-        ).scalars().first()
+            )
+        ).scalar_one_or_none()
 
         op_blocked = db.execute(
             select(UnavailabilityBlock).where(
                 UnavailabilityBlock.operator_id == op.user_id,
                 UnavailabilityBlock.start_time < end_time,
                 UnavailabilityBlock.end_time > start_time
-            ).limit(1)
-        ).scalars().first()
+            )
+        ).scalar_one_or_none()
 
         if not op_busy and not op_blocked:
             return op
     return None
-
-
-def serialize_machine(m: Machine) -> dict:
-    org = m.organization
-    return {
-        "id": str(m.id),
-        "name": m.name,
-        "category": m.category,
-        "daily_rate_net": float(m.daily_rate_net),
-        "deposit_amount": float(m.deposit_amount),
-        "transport_rate_per_km": float(m.transport_rate_per_km),
-        "service_buffer_hours": m.service_buffer_hours,
-        "udt_valid_until": m.udt_valid_until.isoformat() if m.udt_valid_until else None,
-        "organization_id": str(m.organization_id),
-        "organization_name": org.name if org else None,
-        "organization_short_name": (org.short_name or org.name) if org else None,
-        "organization_district": org.district if org else None,
-        "organization_rating": float(org.rating) if org and org.rating is not None else None,
-    }
 
 
 @app.get("/")
@@ -143,26 +114,18 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 @app.get("/machines")
 def list_machines(db: Session = Depends(get_db)):
-    machines = db.execute(
-        select(Machine).options(joinedload(Machine.organization))
-    ).scalars().unique().all()
-    return [serialize_machine(m) for m in machines]
-
-
-@app.get("/vendors")
-def list_vendors(db: Session = Depends(get_db)):
-    vendors = db.execute(
-        select(Organization).where(Organization.is_vendor == True).order_by(Organization.name)
-    ).scalars().all()
+    machines = db.execute(select(Machine)).scalars().all()
     return [
         {
-            "id": str(v.id),
-            "name": v.name,
-            "short_name": v.short_name or v.name,
-            "district": v.district,
-            "rating": float(v.rating) if v.rating is not None else None,
+            "id": str(m.id),
+            "name": m.name,
+            "category": m.category,
+            "daily_rate_net": float(m.daily_rate_net),
+            "deposit_amount": float(m.deposit_amount),
+            "transport_rate_per_km": float(m.transport_rate_per_km),
+            "service_buffer_hours": m.service_buffer_hours
         }
-        for v in vendors
+        for m in machines
     ]
 
 
@@ -175,50 +138,23 @@ def create_booking(
     if payload.end_time <= payload.start_time:
         raise HTTPException(status_code=400, detail="Data zakończenia musi być późniejsza niż rozpoczęcia.")
 
-    machine = db.execute(
-        select(Machine)
-        .options(joinedload(Machine.organization))
-        .where(Machine.id == payload.machine_id)
-    ).scalars().first()
+    machine = db.get(Machine, payload.machine_id)
     if not machine:
         raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
 
-    if machine.udt_valid_until and machine.udt_valid_until < payload.end_time.date():
-        raise HTTPException(
-            status_code=409,
-            detail=f"Maszyna ma nieważny przegląd UDT (ważny do {machine.udt_valid_until.isoformat()})."
-        )
-
-    buffer = timedelta(hours=machine.service_buffer_hours)
-    effective_end = payload.end_time + buffer
-
+    effective_end = payload.end_time + timedelta(hours=machine.service_buffer_hours)
     machine_block = db.execute(
         select(UnavailabilityBlock).where(
             UnavailabilityBlock.machine_id == payload.machine_id,
             UnavailabilityBlock.start_time < effective_end,
             UnavailabilityBlock.end_time > payload.start_time
-        ).limit(1)
-    ).scalars().first()
+        )
+    ).scalar_one_or_none()
 
     if machine_block:
         raise HTTPException(
             status_code=409,
             detail=f"Maszyna jest zablokowana serwisowo ({machine_block.reason.value}) w tym terminie."
-        )
-
-    # Bufor serwisowy także między rezerwacjami (ExcludeConstraint pilnuje tylko surowego zakresu)
-    buffered_conflict = db.execute(
-        select(Booking).where(
-            Booking.machine_id == machine.id,
-            Booking.status != BookingStatus.CANCELLED,
-            Booking.start_time < payload.end_time + buffer,
-            Booking.end_time > payload.start_time - buffer,
-        ).limit(1)
-    ).scalars().first()
-    if buffered_conflict:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Maszyna niedostępna — wymagany bufor serwisowy {machine.service_buffer_hours} h po poprzednim zleceniu."
         )
 
     assigned_op = None
@@ -234,11 +170,10 @@ def create_booking(
     operator_cost = (total_hours * assigned_op.hourly_rate_net) if assigned_op else Decimal("0.00")
 
     transport_cost = Decimal("0.00")
-    org = machine.organization
-    if payload.with_transport and payload.delivery_lat and payload.delivery_lng and org and org.base_lat:
+    if payload.with_transport and payload.delivery_lat and payload.delivery_lng and machine.organization.base_lat:
         dist_km = calculate_distance_km(
-            float(org.base_lat),
-            float(org.base_lng),
+            float(machine.organization.base_lat),
+            float(machine.organization.base_lng),
             float(payload.delivery_lat),
             float(payload.delivery_lng)
         )
@@ -271,7 +206,7 @@ def create_booking(
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail="Konflikt terminów! Maszyna lub operator zostali właśnie zarezerwowani przez innego użytkownika."
+            detail="Konflikt terminów! Maszyna została właśnie zarezerwowana przez innego użytkownika."
         )
 
     return BookingResponse(
@@ -455,21 +390,14 @@ def download_booking_pdf(booking_id: UUID, db: Session = Depends(get_db)):
     if not booking:
         raise HTTPException(status_code=404, detail="Nie znaleziono rezerwacji.")
 
-    machine = db.execute(
-        select(Machine)
-        .options(joinedload(Machine.organization))
-        .where(Machine.id == booking.machine_id)
-    ).scalars().first()
+    machine = db.get(Machine, booking.machine_id)
     client = db.get(User, booking.client_id)
     operator = db.get(User, booking.operator_id) if booking.operator_id else None
     protocols = db.execute(
         select(HandoverProtocol).where(HandoverProtocol.booking_id == booking_id)
     ).scalars().all()
 
-    vendor_name = machine.organization.name if machine and machine.organization else "Dostawca Digvo"
-    pdf_bytes = generate_booking_pdf(
-        booking, machine, client, operator, list(protocols), vendor_name=vendor_name
-    )
+    pdf_bytes = generate_booking_pdf(booking, machine, client, operator, list(protocols))
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

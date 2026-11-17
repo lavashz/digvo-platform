@@ -22,9 +22,6 @@ interface Machine {
   id: string;
   organization_id?: string;
   organization_name?: string;
-  organization_short_name?: string;
-  organization_district?: string;
-  organization_rating?: number | null;
   name: string;
   category: string;
   daily_rate_net: number;
@@ -79,43 +76,47 @@ interface VendorInfo {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const AUTH_STORAGE_KEY = "digvo_auth_user";
 
-const VENDOR_BADGE_COLORS = [
-  "text-amber-400 bg-amber-500/10 border-amber-500/20",
-  "text-rose-400 bg-rose-500/10 border-rose-500/20",
-  "text-sky-400 bg-sky-500/10 border-sky-500/20",
-  "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-];
-
-const FALLBACK_VENDOR: VendorInfo = {
-  id: "unknown",
-  name: "Dostawca Digvo",
-  shortName: "Dostawca",
-  district: "Region kujawsko-pomorski",
-  rating: "—",
-  badgeColor: VENDOR_BADGE_COLORS[0],
+const VENDORS: Record<string, VendorInfo> = {
+  GRASER: {
+    id: "GRASER",
+    name: "Graser Maszyny Budowlane Sp. z o.o.",
+    shortName: "Graser Bydgoszcz",
+    district: "Bydgoszcz • Fordon / Przemysłowa",
+    rating: "4.9 ★",
+    badgeColor: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+  },
+  RAMIRENT: {
+    id: "RAMIRENT",
+    name: "Ramirent S.A. — Oddział Bydgoszcz",
+    shortName: "Ramirent Bydgoszcz",
+    district: "Bydgoszcz • ul. Przemysłowa",
+    rating: "4.8 ★",
+    badgeColor: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+  },
+  CRAMO: {
+    id: "CRAMO",
+    name: "Cramo Polska — Baza Białe Błota",
+    shortName: "Cramo Białe Błota",
+    district: "Białe Błota k. Bydgoszczy",
+    rating: "4.9 ★",
+    badgeColor: "text-sky-400 bg-sky-500/10 border-sky-500/20",
+  },
 };
 
-function badgeColorForId(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash + id.charCodeAt(i) * (i + 1)) % 997;
-  return VENDOR_BADGE_COLORS[hash % VENDOR_BADGE_COLORS.length];
-}
-
 function resolveMachineVendor(machine: Machine): VendorInfo {
-  const id = machine.organization_id;
-  if (!id && !machine.organization_name) return FALLBACK_VENDOR;
-  const name = machine.organization_name || FALLBACK_VENDOR.name;
-  const shortName = machine.organization_short_name || name;
-  const rating =
-    machine.organization_rating != null ? `${machine.organization_rating.toFixed(1)} ★` : "4.8 ★";
-  return {
-    id: id || name,
-    name,
-    shortName,
-    district: machine.organization_district || "Region kujawsko-pomorski",
-    rating,
-    badgeColor: badgeColorForId(id || name),
-  };
+  if (machine.organization_name) {
+    if (machine.organization_name.toLowerCase().includes("ramirent")) return VENDORS.RAMIRENT;
+    if (machine.organization_name.toLowerCase().includes("cramo")) return VENDORS.CRAMO;
+    return VENDORS.GRASER;
+  }
+  const n = machine.name.toLowerCase();
+  if (n.includes("volvo") || n.includes("428f2") || n.includes("liebherr")) {
+    return VENDORS.RAMIRENT;
+  }
+  if (n.includes("kubota") || n.includes("manitou")) {
+    return VENDORS.CRAMO;
+  }
+  return VENDORS.GRASER;
 }
 
 const DEMO_ACCOUNTS = [
@@ -124,9 +125,9 @@ const DEMO_ACCOUNTS = [
   { label: "Klient B2B: KPPRD Inżynieria Drogowa", email: "sprzet@kpprd.pl", role: "CLIENT" },
   { label: "Klient B2B: Aqua-Instal Fordon", email: "biuro@aquainstal-fordon.pl", role: "CLIENT" },
   { label: "Klient: Tomasz Zieliński (Inwestor Fordon)", email: "inwestor@budowa-fordon.pl", role: "CLIENT" },
-  { label: "Dyspozytor Floty: Marek Wiśniewski", email: "dyspozytor@kujawy-maszyny.pl", role: "DISPATCHER" },
-  { label: "Operator UDT: Jan Kowalski", email: "j.kowalski@kujawy-maszyny.pl", role: "OPERATOR" },
-  { label: "Operator UDT: Piotr Nowak", email: "p.nowak@terrarent-bydgoszcz.pl", role: "OPERATOR" },
+  { label: "Dyspozytor Floty: Marek Wiśniewski", email: "dyspozytor@graser-bydgoszcz.pl", role: "DISPATCHER" },
+  { label: "Operator UDT: Jan Kowalski", email: "j.kowalski@graser-bydgoszcz.pl", role: "OPERATOR" },
+  { label: "Operator UDT: Piotr Nowak", email: "p.nowak@graser-bydgoszcz.pl", role: "OPERATOR" },
 ];
 
 function formatApiError(detail: unknown, fallback: string): string {
@@ -613,15 +614,6 @@ export default function DigvoDashboard() {
     return ["ALL", ...unique];
   }, [machines]);
 
-  const vendors = useMemo(() => {
-    const map = new Map<string, VendorInfo>();
-    for (const m of machines) {
-      const v = resolveMachineVendor(m);
-      if (v.id !== "unknown") map.set(v.id, v);
-    }
-    return Array.from(map.values()).sort((a, b) => a.shortName.localeCompare(b.shortName, "pl"));
-  }, [machines]);
-
   const filteredMachines = useMemo(() => {
     return machines.filter((m) => {
       const vendor = resolveMachineVendor(m);
@@ -843,8 +835,8 @@ export default function DigvoDashboard() {
                   className="mt-6 mx-auto max-w-2xl text-base sm:text-lg text-zinc-400 leading-relaxed animate-fade-up"
                   style={{ animationDelay: "160ms" }}
                 >
-                  Marketplace floty budowlanej: lokalni dostawcy udostępniają maszyny, a Ty
-                  rezerwujesz sprzęt z operatorem UDT i transportem — umowa PDF w 30 sekund.
+                  Porównuj dostępność i stawki w czasie rzeczywistym u zweryfikowanych partnerów:
+                  Graser, Ramirent oraz Cramo. Operator z uprawnieniami UDT i umowa PDF w 30 sekund.
                 </p>
 
                 <div
@@ -881,7 +873,7 @@ export default function DigvoDashboard() {
                 >
                   {[
                     { value: String(machines.length), label: "Maszyn w bazie", cls: "text-white" },
-                    { value: String(vendors.length || "—"), label: "Dostawców na marketplace", cls: "text-white" },
+                    { value: "3", label: "Oddziały w Bydgoszczy", cls: "text-white" },
                     { value: "100%", label: "Przeglądy UDT", cls: "text-emerald-400" },
                   ].map((s) => (
                     <div key={s.label} className="bg-black/70 backdrop-blur px-3 py-5 sm:py-6">
@@ -967,7 +959,7 @@ export default function DigvoDashboard() {
                     >
                       Wszystkie wypożyczalnie ({machines.length})
                     </button>
-                    {vendors.map((v) => {
+                    {Object.values(VENDORS).map((v) => {
                       const count = machines.filter((m) => resolveMachineVendor(m).id === v.id).length;
                       return (
                         <button
@@ -1318,7 +1310,7 @@ export default function DigvoDashboard() {
                         {myBookings.map((b) => {
                           const st = statusMeta(b.status);
                           const mObj = machines.find((m) => m.id === b.machine_id);
-                          const vObj = mObj ? resolveMachineVendor(mObj) : FALLBACK_VENDOR;
+                          const vObj = mObj ? resolveMachineVendor(mObj) : VENDORS.GRASER;
                           return (
                             <tr key={b.id} className="hover:bg-white/[0.025] transition-colors">
                               <td className="py-4 pr-4">
