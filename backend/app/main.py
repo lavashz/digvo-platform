@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from app.database import SessionLocal
 from app.models import (
-    User, UserRole, Machine, OperatorProfile,
+    User, UserRole, Machine, OperatorProfile, TransportVehicle,
     OperatorQualification, Booking, BookingStatus,
     UnavailabilityBlock, HandoverProtocol, Qualification
 )
@@ -86,6 +86,33 @@ def find_available_operator(db: Session, machine: Machine, start_time: datetime,
 
         if not op_busy and not op_blocked:
             return op
+    return None
+
+
+def find_available_transport(
+    db: Session,
+    machine: Machine,
+    start_time: datetime,
+    end_time: datetime,
+) -> TransportVehicle | None:
+    vehicles = db.execute(
+        select(TransportVehicle).where(
+            TransportVehicle.organization_id == machine.organization_id,
+            TransportVehicle.is_active == True,
+        )
+    ).scalars().all()
+
+    for vehicle in vehicles:
+        busy = db.execute(
+            select(Booking).where(
+                Booking.transport_vehicle_id == vehicle.id,
+                Booking.status != BookingStatus.CANCELLED,
+                Booking.start_time < end_time,
+                Booking.end_time > start_time,
+            ).limit(1)
+        ).scalars().first()
+        if not busy:
+            return vehicle
     return None
 
 
@@ -189,6 +216,15 @@ def create_booking(
         if not assigned_op:
             raise HTTPException(status_code=409, detail="Brak wolnego operatora z wymaganymi uprawnieniami UDT w tym terminie.")
 
+    assigned_vehicle = None
+    if payload.with_transport:
+        assigned_vehicle = find_available_transport(db, machine, payload.start_time, payload.end_time)
+        if not assigned_vehicle:
+            raise HTTPException(
+                status_code=409,
+                detail="Brak wolnego pojazdu transportowego u tego dostawcy w wybranym terminie.",
+            )
+
     total_hours = Decimal(str((payload.end_time - payload.start_time).total_seconds() / 3600))
     rental_days = max(Decimal("1"), Decimal(str(math.ceil(float(total_hours) / 24))))
 
@@ -212,6 +248,7 @@ def create_booking(
         client_id=current_user.id,
         machine_id=machine.id,
         operator_id=assigned_op.user_id if assigned_op else None,
+        transport_vehicle_id=assigned_vehicle.id if assigned_vehicle else None,
         start_time=payload.start_time,
         end_time=payload.end_time,
         with_operator=payload.with_operator,
@@ -233,7 +270,7 @@ def create_booking(
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail="Konflikt terminów! Maszyna lub operator zostali właśnie zarezerwowani."
+            detail="Konflikt terminów! Maszyna, operator lub transport zostali właśnie zarezerwowani.",
         )
 
     return BookingResponse(

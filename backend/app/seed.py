@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.database import SessionLocal
 from app.models import (
     Organization, User, UserRole, Qualification,
-    Machine, OperatorProfile, OperatorQualification
+    Machine, OperatorProfile, OperatorQualification, TransportVehicle
 )
 
 
@@ -67,6 +67,20 @@ def get_or_create_machine(db, name: str, **kwargs) -> Machine:
         for key, value in kwargs.items():
             setattr(machine, key, value)
     return machine
+
+
+def get_or_create_vehicle(db, plate_number: str, **kwargs) -> TransportVehicle:
+    vehicle = db.execute(
+        select(TransportVehicle).where(TransportVehicle.plate_number == plate_number)
+    ).scalar_one_or_none()
+    if not vehicle:
+        vehicle = TransportVehicle(plate_number=plate_number, **kwargs)
+        db.add(vehicle)
+        db.flush()
+    else:
+        for key, value in kwargs.items():
+            setattr(vehicle, key, value)
+    return vehicle
 
 
 def run_seed():
@@ -320,6 +334,38 @@ def run_seed():
             transport_rate_per_km=Decimal("11.50"),
             service_buffer_hours=3,
             udt_valid_until=date(2028, 7, 19),
+        )
+        get_or_create_vehicle(
+            db,
+            plate_number="CBY 12AB",
+            organization_id=kujawy.id,
+            name="Laweta ciężka Volvo FH",
+            max_weight_tons=Decimal("40.00"),
+            is_active=True,
+        )
+        get_or_create_vehicle(
+            db,
+            plate_number="CBY 34CD",
+            organization_id=kujawy.id,
+            name="Naczepa niskopodwoziowa",
+            max_weight_tons=Decimal("30.00"),
+            is_active=True,
+        )
+        get_or_create_vehicle(
+            db,
+            plate_number="CBY 56EF",
+            organization_id=terrarent.id,
+            name="Laweta MAN TGX",
+            max_weight_tons=Decimal("35.00"),
+            is_active=True,
+        )
+        get_or_create_vehicle(
+            db,
+            plate_number="CNA 78GH",
+            organization_id=budlift.id,
+            name="Transport Budlift — naczepa",
+            max_weight_tons=Decimal("25.00"),
+            is_active=True,
         )
 
         db.commit()

@@ -46,6 +46,7 @@ class Organization(Base):
 
     users: Mapped[list["User"]] = relationship(back_populates="organization")
     machines: Mapped[list["Machine"]] = relationship(back_populates="organization")
+    transport_vehicles: Mapped[list["TransportVehicle"]] = relationship(back_populates="organization")
 
 
 class User(Base):
@@ -112,6 +113,19 @@ class OperatorQualification(Base):
     qualification: Mapped["Qualification"] = relationship()
 
 
+class TransportVehicle(Base):
+    __tablename__ = "transport_vehicles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    plate_number: Mapped[str] = mapped_column(String(32), nullable=False)
+    max_weight_tons: Mapped[Decimal] = mapped_column(Numeric(6, 2), default=Decimal("20.00"))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    organization: Mapped["Organization"] = relationship(back_populates="transport_vehicles")
+
+
 class Booking(Base):
     __tablename__ = "bookings"
 
@@ -119,6 +133,7 @@ class Booking(Base):
     client_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     machine_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("machines.id"), nullable=False)
     operator_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("operator_profiles.user_id"))
+    transport_vehicle_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("transport_vehicles.id"))
 
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -137,14 +152,22 @@ class Booking(Base):
 
     # Gwarancja braku nakładania się rezerwacji dla tej samej maszyny na poziomie PostgreSQL
     __table_args__ = (
-        ExcludeConstraint(
-            ("machine_id", "="),
-            (func.tstzrange(start_time, end_time, "[)"), "&&"),
-            name="excl_machine_booking_overlap",
-            using="gist",
-            where=text("status != 'CANCELLED'"),
-        ),
-    )
+    ExcludeConstraint(
+        ("machine_id", "="),
+        (func.tstzrange(start_time, end_time, "[)"), "&&"),
+        name="excl_machine_booking_overlap",
+        using="gist",
+        where=text("status != 'CANCELLED'"),
+    ),
+    ExcludeConstraint(
+        ("transport_vehicle_id", "="),
+        (func.tstzrange(start_time, end_time, "[)"), "&&"),
+        name="excl_transport_booking_overlap",
+        using="gist",
+        where=text("status != 'CANCELLED' AND transport_vehicle_id IS NOT NULL"),
+    ),
+)
+    
 
 
 class UnavailabilityBlock(Base):
