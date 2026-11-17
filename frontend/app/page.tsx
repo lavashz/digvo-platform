@@ -77,26 +77,26 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const AUTH_STORAGE_KEY = "digvo_auth_user";
 
 const VENDORS: Record<string, VendorInfo> = {
-  GRASER: {
-    id: "GRASER",
-    name: "Graser Maszyny Budowlane Sp. z o.o.",
-    shortName: "Graser Bydgoszcz",
-    district: "Bydgoszcz • Fordon / Przemysłowa",
+  KUJAWY: {
+    id: "KUJAWY",
+    name: "Kujawy Maszyny Sp. z o.o.",
+    shortName: "Kujawy Maszyny",
+    district: "Bydgoszcz • Fordon",
     rating: "4.9 ★",
     badgeColor: "text-amber-400 bg-amber-500/10 border-amber-500/20",
   },
-  RAMIRENT: {
-    id: "RAMIRENT",
-    name: "Ramirent S.A. — Oddział Bydgoszcz",
-    shortName: "Ramirent Bydgoszcz",
+  TERRARENT: {
+    id: "TERRARENT",
+    name: "TerraRent Bydgoszcz Sp. z o.o.",
+    shortName: "TerraRent Bydgoszcz",
     district: "Bydgoszcz • ul. Przemysłowa",
     rating: "4.8 ★",
     badgeColor: "text-rose-400 bg-rose-500/10 border-rose-500/20",
   },
-  CRAMO: {
-    id: "CRAMO",
-    name: "Cramo Polska — Baza Białe Błota",
-    shortName: "Cramo Białe Błota",
+  BUDLIFT: {
+    id: "BUDLIFT",
+    name: "Budlift Białe Błota Sp. z o.o.",
+    shortName: "Budlift Białe Błota",
     district: "Białe Błota k. Bydgoszczy",
     rating: "4.9 ★",
     badgeColor: "text-sky-400 bg-sky-500/10 border-sky-500/20",
@@ -104,19 +104,19 @@ const VENDORS: Record<string, VendorInfo> = {
 };
 
 function resolveMachineVendor(machine: Machine): VendorInfo {
-  if (machine.organization_name) {
-    if (machine.organization_name.toLowerCase().includes("ramirent")) return VENDORS.RAMIRENT;
-    if (machine.organization_name.toLowerCase().includes("cramo")) return VENDORS.CRAMO;
-    return VENDORS.GRASER;
-  }
+  const org = (machine.organization_name || "").toLowerCase();
+  if (org.includes("terrarent")) return VENDORS.TERRARENT;
+  if (org.includes("budlift")) return VENDORS.BUDLIFT;
+  if (org.includes("kujawy")) return VENDORS.KUJAWY;
+
   const n = machine.name.toLowerCase();
   if (n.includes("volvo") || n.includes("428f2") || n.includes("liebherr")) {
-    return VENDORS.RAMIRENT;
+    return VENDORS.TERRARENT;
   }
   if (n.includes("kubota") || n.includes("manitou")) {
-    return VENDORS.CRAMO;
+    return VENDORS.BUDLIFT;
   }
-  return VENDORS.GRASER;
+  return VENDORS.KUJAWY;
 }
 
 const DEMO_ACCOUNTS = [
@@ -125,9 +125,9 @@ const DEMO_ACCOUNTS = [
   { label: "Klient B2B: KPPRD Inżynieria Drogowa", email: "sprzet@kpprd.pl", role: "CLIENT" },
   { label: "Klient B2B: Aqua-Instal Fordon", email: "biuro@aquainstal-fordon.pl", role: "CLIENT" },
   { label: "Klient: Tomasz Zieliński (Inwestor Fordon)", email: "inwestor@budowa-fordon.pl", role: "CLIENT" },
-  { label: "Dyspozytor Floty: Marek Wiśniewski", email: "dyspozytor@graser-bydgoszcz.pl", role: "DISPATCHER" },
-  { label: "Operator UDT: Jan Kowalski", email: "j.kowalski@graser-bydgoszcz.pl", role: "OPERATOR" },
-  { label: "Operator UDT: Piotr Nowak", email: "p.nowak@graser-bydgoszcz.pl", role: "OPERATOR" },
+  { label: "Dyspozytor Floty: Marek Wiśniewski", email: "dyspozytor@kujawy-maszyny.pl", role: "DISPATCHER" },
+  { label: "Operator UDT: Jan Kowalski", email: "j.kowalski@kujawy-maszyny.pl", role: "OPERATOR" },
+  { label: "Operator UDT: Piotr Nowak", email: "p.nowak@terrarent-bydgoszcz.pl", role: "OPERATOR" },
 ];
 
 function formatApiError(detail: unknown, fallback: string): string {
@@ -652,18 +652,16 @@ export default function DigvoDashboard() {
           key={t.key}
           onClick={() => setActiveTab(t.key)}
           aria-current={activeTab === t.key ? "page" : undefined}
-          className={`flex-1 md:flex-none px-4 py-1.5 rounded-full text-[13px] font-medium transition-all duration-200 flex items-center justify-center gap-1.5 ${
-            activeTab === t.key
+          className={`flex-1 md:flex-none px-4 py-1.5 rounded-full text-[13px] font-medium transition-all duration-200 flex items-center justify-center gap-1.5 ${activeTab === t.key
               ? "bg-white text-black shadow-sm"
               : "text-zinc-400 hover:text-white"
-          }`}
+            }`}
         >
           {t.label}
           {t.count !== undefined && (
             <span
-              className={`text-[10px] leading-none px-1.5 py-1 rounded-full ${
-                activeTab === t.key ? "bg-black/10 text-black" : "bg-white/[0.08] text-zinc-300"
-              }`}
+              className={`text-[10px] leading-none px-1.5 py-1 rounded-full ${activeTab === t.key ? "bg-black/10 text-black" : "bg-white/[0.08] text-zinc-300"
+                }`}
             >
               {t.count}
             </span>
@@ -675,12 +673,12 @@ export default function DigvoDashboard() {
 
   const userInitials = authUser
     ? authUser.full_name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((p) => p[0])
-        .join("")
-        .toUpperCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0])
+      .join("")
+      .toUpperCase()
     : "";
 
   return (
@@ -783,16 +781,14 @@ export default function DigvoDashboard() {
         <div className="fixed z-[60] inset-x-0 top-[7.25rem] md:top-[5rem] flex justify-center px-4 pointer-events-none">
           <div
             role="status"
-            className={`pointer-events-auto flex items-center gap-3 max-w-xl w-full sm:w-auto pl-4 pr-2 py-2.5 rounded-2xl border glass-strong shadow-2xl shadow-black/60 animate-pop-in ${
-              message.type === "success"
+            className={`pointer-events-auto flex items-center gap-3 max-w-xl w-full sm:w-auto pl-4 pr-2 py-2.5 rounded-2xl border glass-strong shadow-2xl shadow-black/60 animate-pop-in ${message.type === "success"
                 ? "border-emerald-500/30 text-emerald-100"
                 : "border-rose-500/35 text-rose-100"
-            }`}
+              }`}
           >
             <span
-              className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                message.type === "success" ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
-              }`}
+              className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${message.type === "success" ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                }`}
             >
               {message.type === "success" ? <CheckIcon className="w-3 h-3" /> : <XIcon className="w-3 h-3" />}
             </span>
@@ -835,8 +831,8 @@ export default function DigvoDashboard() {
                   className="mt-6 mx-auto max-w-2xl text-base sm:text-lg text-zinc-400 leading-relaxed animate-fade-up"
                   style={{ animationDelay: "160ms" }}
                 >
-                  Porównuj dostępność i stawki w czasie rzeczywistym u zweryfikowanych partnerów:
-                  Graser, Ramirent oraz Cramo. Operator z uprawnieniami UDT i umowa PDF w 30 sekund.
+                  Marketplace floty budowlanej: lokalni dostawcy udostępniają maszyny, a Ty
+                  rezerwujesz sprzęt z operatorem UDT i transportem — umowa PDF w 30 sekund.
                 </p>
 
                 <div
@@ -951,11 +947,10 @@ export default function DigvoDashboard() {
                   <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:flex-wrap">
                     <button
                       onClick={() => setVendorFilter("ALL")}
-                      className={`shrink-0 px-4 py-2 rounded-full text-xs font-medium transition press ${
-                        vendorFilter === "ALL"
+                      className={`shrink-0 px-4 py-2 rounded-full text-xs font-medium transition press ${vendorFilter === "ALL"
                           ? "bg-white text-black font-semibold"
                           : "bg-panel-2 text-zinc-300 border border-white/[0.08] hover:border-white/[0.2]"
-                      }`}
+                        }`}
                     >
                       Wszystkie wypożyczalnie ({machines.length})
                     </button>
@@ -965,17 +960,15 @@ export default function DigvoDashboard() {
                         <button
                           key={v.id}
                           onClick={() => setVendorFilter(v.id)}
-                          className={`shrink-0 px-4 py-2 rounded-full text-xs font-medium transition press flex items-center gap-2 ${
-                            vendorFilter === v.id
+                          className={`shrink-0 px-4 py-2 rounded-full text-xs font-medium transition press flex items-center gap-2 ${vendorFilter === v.id
                               ? "bg-white text-black font-semibold"
                               : "bg-panel-2 text-zinc-300 border border-white/[0.08] hover:border-white/[0.2]"
-                          }`}
+                            }`}
                         >
                           {v.shortName}
                           <span
-                            className={`text-[10px] leading-none px-1.5 py-1 rounded-full ${
-                              vendorFilter === v.id ? "bg-black/10 text-black" : "bg-white/[0.08] text-zinc-400"
-                            }`}
+                            className={`text-[10px] leading-none px-1.5 py-1 rounded-full ${vendorFilter === v.id ? "bg-black/10 text-black" : "bg-white/[0.08] text-zinc-400"
+                              }`}
                           >
                             {count}
                           </span>
@@ -989,11 +982,10 @@ export default function DigvoDashboard() {
                       <button
                         key={cat}
                         onClick={() => setCategoryFilter(cat)}
-                        className={`shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition press ${
-                          categoryFilter === cat
+                        className={`shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition press ${categoryFilter === cat
                             ? "bg-brand/15 text-brand-soft border border-brand/35"
                             : "text-zinc-400 hover:text-zinc-200 bg-white/[0.03] border border-transparent"
-                        }`}
+                          }`}
                       >
                         {cat === "ALL" ? "Wszystkie kategorie" : cat}
                       </button>
@@ -1030,19 +1022,17 @@ export default function DigvoDashboard() {
                               key={m.id}
                               onClick={() => setSelectedMachine(m)}
                               aria-pressed={isSelected}
-                              className={`group text-left card-lift rounded-3xl overflow-hidden flex flex-col border ${
-                                isSelected
+                              className={`group text-left card-lift rounded-3xl overflow-hidden flex flex-col border ${isSelected
                                   ? "border-brand bg-panel-2 shadow-2xl shadow-brand/10"
                                   : "border-white/[0.08] bg-panel hover:border-white/[0.2]"
-                              }`}
+                                }`}
                             >
                               <span className="machine-stage relative block h-36">
                                 <span className="absolute inset-0 flex items-center justify-center">
                                   <MachineGlyph
                                     category={m.category}
-                                    className={`w-32 h-24 transition-all duration-300 group-hover:scale-105 ${
-                                      isSelected ? "text-brand" : "text-zinc-600 group-hover:text-brand-soft"
-                                    }`}
+                                    className={`w-32 h-24 transition-all duration-300 group-hover:scale-105 ${isSelected ? "text-brand" : "text-zinc-600 group-hover:text-brand-soft"
+                                      }`}
                                   />
                                 </span>
                                 <span
@@ -1228,11 +1218,10 @@ export default function DigvoDashboard() {
                           <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full font-semibold py-4 rounded-full text-[15px] transition press disabled:opacity-50 flex items-center justify-center gap-2 ${
-                              authUser && selectedAvailability && !selectedAvailability.available
+                            className={`w-full font-semibold py-4 rounded-full text-[15px] transition press disabled:opacity-50 flex items-center justify-center gap-2 ${authUser && selectedAvailability && !selectedAvailability.available
                                 ? "bg-panel-3 text-brand-soft border border-brand/30 hover:bg-[#252529]"
                                 : "bg-brand hover:bg-brand-soft text-black shadow-lg shadow-brand/20"
-                            }`}
+                              }`}
                           >
                             {loading ? (
                               <>
@@ -1310,7 +1299,7 @@ export default function DigvoDashboard() {
                         {myBookings.map((b) => {
                           const st = statusMeta(b.status);
                           const mObj = machines.find((m) => m.id === b.machine_id);
-                          const vObj = mObj ? resolveMachineVendor(mObj) : VENDORS.GRASER;
+                          const vObj = mObj ? resolveMachineVendor(mObj) : VENDORS.KUJAWY;
                           return (
                             <tr key={b.id} className="hover:bg-white/[0.025] transition-colors">
                               <td className="py-4 pr-4">
@@ -1433,11 +1422,10 @@ export default function DigvoDashboard() {
                     <button
                       key={f.key}
                       onClick={() => setStatusFilter(f.key)}
-                      className={`shrink-0 text-xs px-3.5 py-1.5 rounded-full transition press ${
-                        statusFilter === f.key
+                      className={`shrink-0 text-xs px-3.5 py-1.5 rounded-full transition press ${statusFilter === f.key
                           ? "bg-white text-black font-semibold"
                           : "bg-black/40 text-zinc-400 hover:text-white border border-white/[0.08]"
-                      }`}
+                        }`}
                     >
                       {f.label}
                     </button>
@@ -1839,14 +1827,12 @@ function ToggleRow({
 }) {
   return (
     <label
-      className={`flex items-center gap-3.5 p-4 rounded-2xl border cursor-pointer transition ${
-        checked ? "bg-brand/[0.06] border-brand/35" : "bg-black/40 border-white/[0.08] hover:border-white/[0.18]"
-      }`}
+      className={`flex items-center gap-3.5 p-4 rounded-2xl border cursor-pointer transition ${checked ? "bg-brand/[0.06] border-brand/35" : "bg-black/40 border-white/[0.08] hover:border-white/[0.18]"
+        }`}
     >
       <span
-        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition ${
-          checked ? "bg-brand text-black" : "bg-white/[0.06] text-zinc-400"
-        }`}
+        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition ${checked ? "bg-brand text-black" : "bg-white/[0.06] text-zinc-400"
+          }`}
       >
         {icon}
       </span>
