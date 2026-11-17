@@ -58,7 +58,8 @@ def generate_booking_pdf(
     )
     op_label = f"{operator.full_name} (Uprawnienia UDT)" if operator else "Najem bez operatora"
     pdf.cell(0, 6, clean_pl(f"Operator: {op_label}"), new_x="LMARGIN", new_y="NEXT")
-loc_label = booking.delivery_address if booking.with_transport else "Odbior wlasny z bazy dostawcy"    pdf.cell(0, 6, clean_pl(f"Miejsce dostawy: {loc_label}"), new_x="LMARGIN", new_y="NEXT")
+    loc_label = booking.delivery_address if booking.with_transport else "Odbior wlasny z bazy dostawcy"
+    pdf.cell(0, 6, clean_pl(f"Miejsce dostawy: {loc_label}"), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     # Sekcja 3: Rozliczenie finansowe
