@@ -23,6 +23,8 @@ interface Machine {
   id: string;
   organization_id?: string;
   organization_name?: string;
+  base_lat?: number | null;
+  base_lng?: number | null;
   name: string;
   category: string;
   daily_rate_net: number;
@@ -39,11 +41,20 @@ interface BookingQuote {
   operator_hourly_rate: number | null;
   transport_cost: number;
   distance_km_one_way: number | null;
+  transport_buffer_hours: number | null;
   total_net: number;
   total_gross: number;
   deposit_amount: number;
   available: boolean;
   unavailable_reason: string | null;
+}
+
+interface SitePreset {
+  id: string;
+  label: string;
+  address: string;
+  lat: number;
+  lng: number;
 }
 
 interface Protocol {
@@ -135,6 +146,37 @@ function resolveMachineVendor(machine: Machine): VendorInfo {
   return VENDORS.KUJAWY;
 }
 
+const SITE_PRESETS: SitePreset[] = [
+  {
+    id: "fordon",
+    label: "Bydgoszcz • Fordon",
+    address: "ul. Fordońska 40, Bydgoszcz",
+    lat: 53.1482,
+    lng: 18.1705,
+  },
+  {
+    id: "bppt",
+    label: "Bydgoszcz • BPPT",
+    address: "ul. Przemysłowa 24, Bydgoszcz",
+    lat: 53.126,
+    lng: 18.045,
+  },
+  {
+    id: "torun",
+    label: "Toruń • Wschodnia",
+    address: "ul. Włocławska 167, Toruń",
+    lat: 53.0138,
+    lng: 18.5981,
+  },
+  {
+    id: "inowroclaw",
+    label: "Inowrocław • budowa",
+    address: "ul. Dworcowa 12, Inowrocław",
+    lat: 52.7957,
+    lng: 18.2636,
+  },
+];
+
 const DEMO_ACCOUNTS = [
   { label: "Klient B2B: PW Lech Budownictwo (Bydgoszcz)", email: "zamowienia@pwlech-bydgoszcz.pl", role: "CLIENT" },
   { label: "Klient B2B: Ebud-Przemysłówka S.A. (BPPT)", email: "logistyka@ebud-bydgoszcz.pl", role: "CLIENT" },
@@ -186,8 +228,11 @@ export default function DigvoDashboard() {
   const [endHour, setEndHour] = useState("16:00");
   const [withOperator, setWithOperator] = useState(true);
   const [withTransport, setWithTransport] = useState(true);
-  const [address, setAddress] = useState("ul. Fordońska 40, Bydgoszcz");
-
+  const [siteId, setSiteId] = useState(SITE_PRESETS[0].id);
+  const [address, setAddress] = useState(SITE_PRESETS[0].address);
+  const [deliveryLat, setDeliveryLat] = useState(SITE_PRESETS[0].lat);
+  const [deliveryLng, setDeliveryLng] = useState(SITE_PRESETS[0].lng);
+  
   // Dyspozytor
   const [blockMachineId, setBlockMachineId] = useState("");
   const [blockDate, setBlockDate] = useState("2026-11-27");
@@ -371,10 +416,10 @@ useEffect(() => {
           with_operator: withOperator,
           with_transport: withTransport,
           delivery_address: withTransport ? address : null,
-          delivery_lat: withTransport ? 53.126 : null,
-          delivery_lng: withTransport ? 18.045 : null,
+          delivery_lat: withTransport ? deliveryLat : null,
+          delivery_lng: withTransport ? deliveryLng : null,
           has_damage_waiver: false,
-        }),
+}),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -393,7 +438,7 @@ useEffect(() => {
     controller.abort();
     window.clearTimeout(timer);
   };
-}, [selectedMachine, date, startHour, endHour, withOperator, withTransport, address]);
+}, [selectedMachine, date, startHour, endHour, withOperator, withTransport, address, deliveryLat, deliveryLng]);
 
   useEffect(() => {
     fetch(`${API_URL}/fx/eur`)
@@ -440,8 +485,8 @@ useEffect(() => {
           with_operator: withOperator,
           with_transport: withTransport,
           delivery_address: withTransport ? address : null,
-          delivery_lat: 53.126,
-          delivery_lng: 18.045,
+          delivery_lat: withTransport ? deliveryLat : null,
+          delivery_lng: withTransport ? deliveryLng : null,
           has_damage_waiver: false,
         }),
       });
@@ -1270,18 +1315,58 @@ useEffect(() => {
                           </div>
 
                           {withTransport && (
-                            <label className="block animate-fade-in">
-                              <span className="flex items-center gap-1.5 text-[11px] text-zinc-400 mb-1.5">
-                                <PinIcon className="w-3.5 h-3.5" /> {t(locale, "siteLocation")}
-                              </span>
-                              <input
-                                type="text"
-                                value={address}
-                                onChange={(e) => setAddress(e.target.value)}
-                                className={`${inputCls} rounded-2xl`}
-                                required
-                              />
-                            </label>
+                            <div className="space-y-2.5 animate-fade-in">
+                              <label className="block">
+                                <span className="flex items-center gap-1.5 text-[11px] text-zinc-400 mb-1.5">
+                                  <PinIcon className="w-3.5 h-3.5" /> {t(locale, "sitePreset")}
+                                </span>
+                                <select
+                                  value={siteId}
+                                  onChange={(e) => {
+                                    const preset = SITE_PRESETS.find((s) => s.id === e.target.value);
+                                    if (!preset) return;
+                                    setSiteId(preset.id);
+                                    setAddress(preset.address);
+                                    setDeliveryLat(preset.lat);
+                                    setDeliveryLng(preset.lng);
+                                  }}
+                                  className={`${inputCls} rounded-2xl`}
+                                >
+                                  {SITE_PRESETS.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="block">
+                                <span className="block text-[11px] text-zinc-400 mb-1.5">
+                                  {t(locale, "siteLocation")}
+                                </span>
+                                <input
+                                  type="text"
+                                  value={address}
+                                  onChange={(e) => setAddress(e.target.value)}
+                                  className={`${inputCls} rounded-2xl`}
+                                  required
+                                />
+                              </label>
+                              {selectedMachine?.base_lat != null &&
+                                selectedMachine?.base_lng != null && (
+                                  <div className="rounded-2xl overflow-hidden border border-white/[0.08] bg-black/30">
+                                    <iframe
+                                      title="OpenStreetMap delivery"
+                                      className="w-full h-40 border-0 grayscale-[20%]"
+                                      loading="lazy"
+                                      referrerPolicy="no-referrer-when-downgrade"
+                                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${Math.min(selectedMachine.base_lng, deliveryLng) - 0.08}%2C${Math.min(selectedMachine.base_lat, deliveryLat) - 0.05}%2C${Math.max(selectedMachine.base_lng, deliveryLng) + 0.08}%2C${Math.max(selectedMachine.base_lat, deliveryLat) + 0.05}&layer=mapnik&marker=${deliveryLat}%2C${deliveryLng}`}
+                                    />
+                                    <p className="px-3 py-2 text-[10px] text-zinc-500">
+                                      {t(locale, "mapCaption")}
+                                    </p>
+                                  </div>
+                                )}
+                            </div>
                           )}
 
                           <div className="rounded-2xl bg-black/40 border border-white/[0.07] p-5 space-y-2.5 text-[13px]">
@@ -1331,6 +1416,12 @@ useEffect(() => {
                             {quote?.distance_km_one_way != null && withTransport && (
                               <p className="text-[11px] text-zinc-500">
                                 {t(locale, "distanceOneWay")}: {quote.distance_km_one_way} km
+                                {quote.transport_buffer_hours != null && (
+                                  <>
+                                    {" · "}
+                                    {t(locale, "transportBuffer")}: {quote.transport_buffer_hours} h
+                                  </>
+                                )}
                               </p>
                             )}
 

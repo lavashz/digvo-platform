@@ -42,6 +42,11 @@ def get_db():
         yield db
     finally:
         db.close()
+        
+
+AVG_TRANSPORT_SPEED_KMH = 45.0
+TRANSPORT_LOAD_HOURS = 0.5
+DEFAULT_TRANSPORT_BUFFER_HOURS = 1.0
 
 
 def calculate_distance_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -52,6 +57,28 @@ def calculate_distance_km(lat1: float, lng1: float, lat2: float, lng2: float) ->
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     straight_km = 2 * r * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return round(straight_km * 1.25, 1)
+
+
+def estimate_transport_buffer_hours(distance_km: float | None) -> float:
+    if distance_km is None or distance_km <= 0:
+        return DEFAULT_TRANSPORT_BUFFER_HOURS
+    hours = (distance_km / AVG_TRANSPORT_SPEED_KMH) + TRANSPORT_LOAD_HOURS
+    return round(max(DEFAULT_TRANSPORT_BUFFER_HOURS, hours), 2)
+
+
+def resolve_delivery_distance_km(org, payload: BookingCreate) -> float | None:
+    if not payload.with_transport:
+        return None
+    if payload.delivery_lat is None or payload.delivery_lng is None:
+        return None
+    if not org or org.base_lat is None or org.base_lng is None:
+        return None
+    return calculate_distance_km(
+        float(org.base_lat),
+        float(org.base_lng),
+        float(payload.delivery_lat),
+        float(payload.delivery_lng),
+    )
 
 
 def find_available_operator(db: Session, machine: Machine, start_time: datetime, end_time: datetime) -> OperatorProfile | None:
@@ -94,7 +121,12 @@ def find_available_transport(
     machine: Machine,
     start_time: datetime,
     end_time: datetime,
+    transport_buffer: timedelta | None = None,
 ) -> TransportVehicle | None:
+    buffer = transport_buffer or timedelta(0)
+    window_start = start_time - buffer
+    window_end = end_time + buffer
+
     vehicles = db.execute(
         select(TransportVehicle).where(
             TransportVehicle.organization_id == machine.organization_id,
@@ -107,8 +139,8 @@ def find_available_transport(
             select(Booking).where(
                 Booking.transport_vehicle_id == vehicle.id,
                 Booking.status != BookingStatus.CANCELLED,
-                Booking.start_time < end_time,
-                Booking.end_time > start_time,
+                Booking.start_time < window_end,
+                Booking.end_time > window_start,
             ).limit(1)
         ).scalars().first()
         if not busy:
@@ -166,16 +198,22 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 @app.get("/machines")
 def list_machines(db: Session = Depends(get_db)):
-    machines = db.execute(select(Machine)).scalars().all()
+    machines = db.execute(
+        select(Machine).options(joinedload(Machine.organization))
+    ).scalars().unique().all()
     return [
         {
             "id": str(m.id),
+            "organization_id": str(m.organization_id),
+            "organization_name": m.organization.name if m.organization else None,
+            "base_lat": float(m.organization.base_lat) if m.organization and m.organization.base_lat is not None else None,
+            "base_lng": float(m.organization.base_lng) if m.organization and m.organization.base_lng is not None else None,
             "name": m.name,
             "category": m.category,
             "daily_rate_net": float(m.daily_rate_net),
             "deposit_amount": float(m.deposit_amount),
             "transport_rate_per_km": float(m.transport_rate_per_km),
-            "service_buffer_hours": m.service_buffer_hours
+            "service_buffer_hours": m.service_buffer_hours,
         }
         for m in machines
     ]
@@ -223,6 +261,15 @@ def quote_booking(payload: BookingCreate, db: Session = Depends(get_db)):
         if buffered_conflict:
             unavailable_reason = f"Maszyna niedostępna — wymagany bufor serwisowy {machine.service_buffer_hours} h."
 
+    org = machine.organization
+    distance_km = resolve_delivery_distance_km(org, payload)
+    transport_buffer_hours = (
+        estimate_transport_buffer_hours(distance_km) if payload.with_transport else None
+    )
+    transport_buffer = (
+        timedelta(hours=transport_buffer_hours) if transport_buffer_hours is not None else None
+    )
+
     assigned_op = None
     if payload.with_operator and not unavailable_reason:
         assigned_op = find_available_operator(db, machine, payload.start_time, payload.end_time)
@@ -230,16 +277,20 @@ def quote_booking(payload: BookingCreate, db: Session = Depends(get_db)):
             unavailable_reason = "Brak wolnego operatora z wymaganymi uprawnieniami UDT w tym terminie."
 
     if payload.with_transport and not unavailable_reason:
-        assigned_vehicle = find_available_transport(db, machine, payload.start_time, payload.end_time)
+        assigned_vehicle = find_available_transport(
+            db, machine, payload.start_time, payload.end_time, transport_buffer
+        )
         if not assigned_vehicle:
-            unavailable_reason = "Brak wolnego pojazdu transportowego u tego dostawcy w wybranym terminie."
+            unavailable_reason = (
+                "Brak wolnego pojazdu transportowego u tego dostawcy w wybranym terminie "
+                f"(wraz z buforem logistycznym {transport_buffer_hours} h)."
+            )
 
     total_hours = Decimal(str((payload.end_time - payload.start_time).total_seconds() / 3600))
     rental_days = max(Decimal("1"), Decimal(str(math.ceil(float(total_hours) / 24))))
     machine_cost = (rental_days * machine.daily_rate_net).quantize(Decimal("0.01"))
 
     operator_rate = assigned_op.hourly_rate_net if assigned_op else Decimal("0.00")
-    # do podglądu stawki, gdy operator jeszcze nieprzypisany: weź pierwszą aktywną stawkę dostawcy
     if payload.with_operator and assigned_op is None:
         preview_op = db.execute(
             select(OperatorProfile).where(
@@ -253,15 +304,7 @@ def quote_booking(payload: BookingCreate, db: Session = Depends(get_db)):
     operator_cost = (total_hours * operator_rate).quantize(Decimal("0.01")) if payload.with_operator else Decimal("0.00")
 
     transport_cost = Decimal("0.00")
-    distance_km = None
-    org = machine.organization
-    if payload.with_transport and payload.delivery_lat and payload.delivery_lng and org and org.base_lat:
-        distance_km = calculate_distance_km(
-            float(org.base_lat),
-            float(org.base_lng),
-            float(payload.delivery_lat),
-            float(payload.delivery_lng),
-        )
+    if distance_km is not None:
         transport_cost = (Decimal(str(distance_km * 2)) * machine.transport_rate_per_km).quantize(Decimal("0.01"))
 
     total_net = (machine_cost + operator_cost + transport_cost).quantize(Decimal("0.01"))
@@ -275,6 +318,7 @@ def quote_booking(payload: BookingCreate, db: Session = Depends(get_db)):
         operator_hourly_rate=operator_rate if payload.with_operator else None,
         transport_cost=transport_cost,
         distance_km_one_way=distance_km,
+        transport_buffer_hours=transport_buffer_hours,
         total_net=total_net,
         total_gross=total_gross,
         deposit_amount=machine.deposit_amount,
@@ -337,6 +381,15 @@ def create_booking(
             detail=f"Maszyna niedostępna — wymagany bufor serwisowy {machine.service_buffer_hours} h po poprzednim zleceniu."
         )
 
+    org = machine.organization
+    distance_km = resolve_delivery_distance_km(org, payload)
+    transport_buffer_hours = (
+        estimate_transport_buffer_hours(distance_km) if payload.with_transport else None
+    )
+    transport_buffer = (
+        timedelta(hours=transport_buffer_hours) if transport_buffer_hours is not None else None
+    )
+
     assigned_op = None
     if payload.with_operator:
         assigned_op = find_available_operator(db, machine, payload.start_time, payload.end_time)
@@ -345,11 +398,16 @@ def create_booking(
 
     assigned_vehicle = None
     if payload.with_transport:
-        assigned_vehicle = find_available_transport(db, machine, payload.start_time, payload.end_time)
+        assigned_vehicle = find_available_transport(
+            db, machine, payload.start_time, payload.end_time, transport_buffer
+        )
         if not assigned_vehicle:
             raise HTTPException(
                 status_code=409,
-                detail="Brak wolnego pojazdu transportowego u tego dostawcy w wybranym terminie.",
+                detail=(
+                    "Brak wolnego pojazdu transportowego u tego dostawcy w wybranym terminie "
+                    f"(wraz z buforem logistycznym {transport_buffer_hours} h)."
+                ),
             )
 
     total_hours = Decimal(str((payload.end_time - payload.start_time).total_seconds() / 3600))
@@ -359,15 +417,8 @@ def create_booking(
     operator_cost = (total_hours * assigned_op.hourly_rate_net) if assigned_op else Decimal("0.00")
 
     transport_cost = Decimal("0.00")
-    org = machine.organization
-    if payload.with_transport and payload.delivery_lat and payload.delivery_lng and org and org.base_lat:
-        dist_km = calculate_distance_km(
-            float(org.base_lat),
-            float(org.base_lng),
-            float(payload.delivery_lat),
-            float(payload.delivery_lng)
-        )
-        transport_cost = Decimal(str(dist_km * 2)) * machine.transport_rate_per_km
+    if distance_km is not None:
+        transport_cost = Decimal(str(distance_km * 2)) * machine.transport_rate_per_km
 
     total_price = (machine_cost + operator_cost + transport_cost).quantize(Decimal("0.01"))
 

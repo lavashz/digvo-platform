@@ -42,6 +42,7 @@ class BookingQuoteResponse(BaseModel):
     operator_hourly_rate: Decimal | None = None
     transport_cost: Decimal
     distance_km_one_way: float | None = None
+    transport_buffer_hours: float | None = None
     total_net: Decimal
     total_gross: Decimal
     deposit_amount: Decimal
