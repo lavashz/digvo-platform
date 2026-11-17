@@ -8,7 +8,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.database import SessionLocal
 from app.models import (
     User, UserRole, Machine, OperatorProfile,
@@ -73,16 +73,16 @@ def find_available_operator(db: Session, machine: Machine, start_time: datetime,
                 Booking.status != BookingStatus.CANCELLED,
                 Booking.start_time < end_time,
                 Booking.end_time > start_time
-            )
-        ).scalar_one_or_none()
+            ).limit(1)
+        ).scalars().first()
 
         op_blocked = db.execute(
             select(UnavailabilityBlock).where(
                 UnavailabilityBlock.operator_id == op.user_id,
                 UnavailabilityBlock.start_time < end_time,
                 UnavailabilityBlock.end_time > start_time
-            )
-        ).scalar_one_or_none()
+            ).limit(1)
+        ).scalars().first()
 
         if not op_busy and not op_blocked:
             return op
@@ -138,23 +138,49 @@ def create_booking(
     if payload.end_time <= payload.start_time:
         raise HTTPException(status_code=400, detail="Data zakończenia musi być późniejsza niż rozpoczęcia.")
 
-    machine = db.get(Machine, payload.machine_id)
+    machine = db.execute(
+        select(Machine)
+        .options(joinedload(Machine.organization))
+        .where(Machine.id == payload.machine_id)
+    ).scalars().first()
     if not machine:
         raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
 
-    effective_end = payload.end_time + timedelta(hours=machine.service_buffer_hours)
+    if machine.udt_valid_until and machine.udt_valid_until < payload.end_time.date():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Maszyna ma nieważny przegląd UDT (ważny do {machine.udt_valid_until.isoformat()})."
+        )
+
+    buffer = timedelta(hours=machine.service_buffer_hours)
+    effective_end = payload.end_time + buffer
+
     machine_block = db.execute(
         select(UnavailabilityBlock).where(
             UnavailabilityBlock.machine_id == payload.machine_id,
             UnavailabilityBlock.start_time < effective_end,
             UnavailabilityBlock.end_time > payload.start_time
-        )
-    ).scalar_one_or_none()
+        ).limit(1)
+    ).scalars().first()
 
     if machine_block:
         raise HTTPException(
             status_code=409,
             detail=f"Maszyna jest zablokowana serwisowo ({machine_block.reason.value}) w tym terminie."
+        )
+
+    buffered_conflict = db.execute(
+        select(Booking).where(
+            Booking.machine_id == machine.id,
+            Booking.status != BookingStatus.CANCELLED,
+            Booking.start_time < payload.end_time + buffer,
+            Booking.end_time > payload.start_time - buffer,
+        ).limit(1)
+    ).scalars().first()
+    if buffered_conflict:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Maszyna niedostępna — wymagany bufor serwisowy {machine.service_buffer_hours} h po poprzednim zleceniu."
         )
 
     assigned_op = None
@@ -170,10 +196,11 @@ def create_booking(
     operator_cost = (total_hours * assigned_op.hourly_rate_net) if assigned_op else Decimal("0.00")
 
     transport_cost = Decimal("0.00")
-    if payload.with_transport and payload.delivery_lat and payload.delivery_lng and machine.organization.base_lat:
+    org = machine.organization
+    if payload.with_transport and payload.delivery_lat and payload.delivery_lng and org and org.base_lat:
         dist_km = calculate_distance_km(
-            float(machine.organization.base_lat),
-            float(machine.organization.base_lng),
+            float(org.base_lat),
+            float(org.base_lng),
             float(payload.delivery_lat),
             float(payload.delivery_lng)
         )
@@ -206,7 +233,7 @@ def create_booking(
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail="Konflikt terminów! Maszyna została właśnie zarezerwowana przez innego użytkownika."
+            detail="Konflikt terminów! Maszyna lub operator zostali właśnie zarezerwowani."
         )
 
     return BookingResponse(
@@ -222,7 +249,6 @@ def create_booking(
         deposit_amount=machine.deposit_amount,
         status=new_booking.status.value
     )
-
 
 @app.get("/bookings")
 def list_bookings(db: Session = Depends(get_db)):
