@@ -47,7 +47,7 @@ def get_or_create_machine(db, name: str, **kwargs) -> Machine:
 def run_seed():
     db = SessionLocal()
     try:
-        # 1. Organizacja główna (Wypożyczalnia w Bydgoszczy)
+        # 1. Dostawcy sprzętu (Vendors) — Oddziały Bydgoszcz
         graser = get_or_create_org(
             db,
             tax_id="5541234567",
@@ -57,8 +57,26 @@ def run_seed():
             base_lat=Decimal("53.123480"),
             base_lng=Decimal("18.008438")
         )
+        ramirent = get_or_create_org(
+            db,
+            tax_id="5213004910",
+            name="Ramirent S.A. — Oddział Bydgoszcz",
+            is_vendor=True,
+            oc_valid_until=date(2028, 6, 30),
+            base_lat=Decimal("53.116200"),
+            base_lng=Decimal("18.067500")
+        )
+        cramo = get_or_create_org(
+            db,
+            tax_id="5272489123",
+            name="Cramo Polska — Baza Białe Błota",
+            is_vendor=True,
+            oc_valid_until=date(2028, 3, 15),
+            base_lat=Decimal("53.102400"),
+            base_lng=Decimal("17.921800")
+        )
 
-        # 1b. Przykładowe firmy budowlane / klienci B2B z regionu
+        # 1b. Klienci B2B (Firmy wykonawcze z regionu)
         client_orgs_data = [
             {
                 "tax_id": "5540312456",
@@ -95,13 +113,13 @@ def run_seed():
         q_koparko_lad = get_or_create_qual(db, "KOP-LAD-I", "Koparkoładowarki kl. I")
         q_ladowarka_1 = get_or_create_qual(db, "LAD-JED-I", "Ładowarki jednonaczyniowe kl. I")
 
-        # 3. Użytkownicy (Dyspozytor, 2 Operatorów, Klienci B2B)
+        # 3. Użytkownicy (Dyspozytorzy, Operatorzy, Klienci B2B)
         dispatcher = get_or_create_user(
             db,
             email="dyspozytor@graser-bydgoszcz.pl",
             organization_id=graser.id,
             password_hash="hashed_secret_123",
-            full_name="Marek Wiśniewski (Dyspozytor)",
+            full_name="Marek Wiśniewski (Dyspozytor Floty)",
             phone="+48 500 100 200",
             role=UserRole.DISPATCHER
         )
@@ -117,7 +135,7 @@ def run_seed():
         op2_user = get_or_create_user(
             db,
             email="p.nowak@graser-bydgoszcz.pl",
-            organization_id=graser.id,
+            organization_id=ramirent.id,
             password_hash="hashed_secret_123",
             full_name="Piotr Nowak",
             phone="+48 500 500 600",
@@ -132,7 +150,6 @@ def run_seed():
             role=UserRole.CLIENT
         )
 
-        # Tworzenie firm B2B i przypisanych do nich kont klientów
         created_clients = [client_user]
         for c in client_orgs_data:
             org = get_or_create_org(
@@ -154,7 +171,7 @@ def run_seed():
             )
             created_clients.append(u)
 
-        # 4. Profile operatorów i ich uprawnienia (jeśli jeszcze nie istnieją)
+        # 4. Profile operatorów
         if not db.execute(select(OperatorProfile).where(OperatorProfile.user_id == op1_user.id)).scalar_one_or_none():
             db.add(OperatorProfile(
                 user_id=op1_user.id,
@@ -171,8 +188,8 @@ def run_seed():
         if not db.execute(select(OperatorProfile).where(OperatorProfile.user_id == op2_user.id)).scalar_one_or_none():
             db.add(OperatorProfile(
                 user_id=op2_user.id,
-                organization_id=graser.id,
-                hourly_rate_net=Decimal("60.00"),
+                organization_id=ramirent.id,
+                hourly_rate_net=Decimal("65.00"),
                 is_active=True
             ))
             db.flush()
@@ -181,7 +198,7 @@ def run_seed():
                 OperatorQualification(operator_id=op2_user.id, qualification_id=q_ladowarka_1.id, valid_until=date(2027, 9, 15)),
             ])
 
-        # 5. Maszyny budowlane (rozszerzony katalog oddziału Bydgoszcz)
+        # 5. Maszyny budowlane — Graser Maszyny Budowlane
         m1 = get_or_create_machine(
             db,
             name="Koparka gąsienicowa CAT 320 (20t)",
@@ -206,18 +223,6 @@ def run_seed():
             service_buffer_hours=2,
             udt_valid_until=date(2027, 8, 10)
         )
-        m3 = get_or_create_machine(
-            db,
-            name="Ładowarka kołowa Volvo L60H",
-            organization_id=graser.id,
-            required_qualification_id=q_ladowarka_1.id,
-            category="Ładowarki",
-            daily_rate_net=Decimal("850.00"),
-            deposit_amount=Decimal("2000.00"),
-            transport_rate_per_km=Decimal("12.00"),
-            service_buffer_hours=3,
-            udt_valid_until=date(2027, 11, 1)
-        )
         m4 = get_or_create_machine(
             db,
             name="Minikoparka Bobcat E27z (2.7t)",
@@ -230,22 +235,24 @@ def run_seed():
             service_buffer_hours=2,
             udt_valid_until=date(2028, 2, 15)
         )
-        m5 = get_or_create_machine(
+
+        # 5b. Maszyny budowlane — Ramirent Oddział Bydgoszcz
+        m3 = get_or_create_machine(
             db,
-            name="Minikoparka Kubota KX019-4 (1.9t)",
-            organization_id=graser.id,
-            required_qualification_id=q_koparka_1.id,
-            category="Minikoparki",
-            daily_rate_net=Decimal("360.00"),
-            deposit_amount=Decimal("800.00"),
-            transport_rate_per_km=Decimal("6.00"),
-            service_buffer_hours=2,
-            udt_valid_until=date(2028, 4, 1)
+            name="Ładowarka kołowa Volvo L60H",
+            organization_id=ramirent.id,
+            required_qualification_id=q_ladowarka_1.id,
+            category="Ładowarki",
+            daily_rate_net=Decimal("850.00"),
+            deposit_amount=Decimal("2000.00"),
+            transport_rate_per_km=Decimal("12.00"),
+            service_buffer_hours=3,
+            udt_valid_until=date(2027, 11, 1)
         )
         m6 = get_or_create_machine(
             db,
             name="Koparkoładowarka CAT 428F2",
-            organization_id=graser.id,
+            organization_id=ramirent.id,
             required_qualification_id=q_koparko_lad.id,
             category="Koparkoładowarki",
             daily_rate_net=Decimal("680.00"),
@@ -254,47 +261,52 @@ def run_seed():
             service_buffer_hours=2,
             udt_valid_until=date(2027, 10, 12)
         )
+        m7 = get_or_create_machine(
+            db,
+            name="Koparka kołowa Liebherr A 914 Compact",
+            organization_id=ramirent.id,
+            required_qualification_id=q_koparka_1.id,
+            category="Koparki kołowe",
+            daily_rate_net=Decimal("1090.00"),
+            deposit_amount=Decimal("2500.00"),
+            transport_rate_per_km=Decimal("13.00"),
+            service_buffer_hours=4,
+            udt_valid_until=date(2028, 5, 1)
+        )
 
-        # 6. Przykładowe rezerwacje (tylko jeśli w bazie nie ma jeszcze żadnej rezerwacji)
-        existing_bookings = db.execute(select(Booking)).scalars().all()
-        if not existing_bookings:
-            tomorrow_start = datetime.now(timezone.utc).replace(hour=7, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            tomorrow_end = tomorrow_start + timedelta(hours=8)
+        # 5c. Maszyny budowlane — Cramo Polska (Baza Białe Błota)
+        m5 = get_or_create_machine(
+            db,
+            name="Minikoparka Kubota KX019-4 (1.9t)",
+            organization_id=cramo.id,
+            required_qualification_id=q_koparka_1.id,
+            category="Minikoparki",
+            daily_rate_net=Decimal("360.00"),
+            deposit_amount=Decimal("800.00"),
+            transport_rate_per_km=Decimal("6.00"),
+            service_buffer_hours=2,
+            udt_valid_until=date(2028, 4, 1)
+        )
+        m8 = get_or_create_machine(
+            db,
+            name="Ładowarka teleskopowa Manitou MT 1440",
+            organization_id=cramo.id,
+            required_qualification_id=q_ladowarka_1.id,
+            category="Ładowarki teleskopowe",
+            daily_rate_net=Decimal("790.00"),
+            deposit_amount=Decimal("2000.00"),
+            transport_rate_per_km=Decimal("11.50"),
+            service_buffer_hours=3,
+            udt_valid_until=date(2028, 7, 19)
+        )
 
-            b1 = Booking(
-                client_id=created_clients[1].id,  # PW Lech
-                machine_id=m1.id,
-                operator_id=op1_user.id,
-                start_time=tomorrow_start,
-                end_time=tomorrow_end,
-                with_operator=True,
-                with_transport=True,
-                delivery_address="ul. Fordońska 142, Bydgoszcz",
-                delivery_lat=Decimal("53.126500"),
-                delivery_lng=Decimal("18.081200"),
-                total_price_net=Decimal("1920.00"),
-                deposit_paid=Decimal("3000.00"),
-                status=BookingStatus.CONFIRMED
-            )
-            b2 = Booking(
-                client_id=created_clients[2].id,  # Ebud-Przemysłówka
-                machine_id=m3.id,
-                operator_id=op2_user.id,
-                start_time=tomorrow_start + timedelta(days=2),
-                end_time=tomorrow_end + timedelta(days=2),
-                with_operator=True,
-                with_transport=True,
-                delivery_address="ul. Ernsta Petersona 8 (BPPT), Bydgoszcz",
-                delivery_lat=Decimal("53.078200"),
-                delivery_lng=Decimal("18.069100"),
-                total_price_net=Decimal("1450.00"),
-                deposit_paid=Decimal("2000.00"),
-                status=BookingStatus.PENDING
-            )
-            db.add_all([b1, b2])
+        # Aktualizacja przypisania dostawców dla już istniejących maszyn w bazie
+        m3.organization_id = ramirent.id
+        m6.organization_id = ramirent.id
+        m5.organization_id = cramo.id
 
         db.commit()
-        print("Sukces! Baza Digvo została zaktualizowana o firmy B2B z Bydgoszczy i rozszerzoną flotę.")
+        print("Sukces! Baza Digvo została rozbudowana o dostawców Graser, Ramirent oraz Cramo.")
     except Exception as e:
         db.rollback()
         print(f"Błąd podczas zasilania bazy: {e}")
