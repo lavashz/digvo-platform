@@ -1,8 +1,18 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 from app.models import BookingStatus, BlockReason
+
+WARSAW = ZoneInfo("Europe/Warsaw")
+
+
+def ensure_warsaw(dt: datetime) -> datetime:
+    """Naiwna data z frontu = czas ścienny PL; aware → przelicz na Warsaw."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=WARSAW)
+    return dt.astimezone(WARSAW)
 
 
 class BookingCreate(BaseModel):
@@ -15,6 +25,11 @@ class BookingCreate(BaseModel):
     delivery_lat: Decimal | None = Field(default=Decimal("53.126000"))
     delivery_lng: Decimal | None = Field(default=Decimal("18.045000"))
     has_damage_waiver: bool = False
+    
+    @field_validator("start_time", "end_time", mode="after")
+    @classmethod
+    def localize_booking_times(cls, v: datetime) -> datetime:
+        return ensure_warsaw(v)
 
 
 class BookingResponse(BaseModel):
@@ -69,8 +84,10 @@ class BlockCreate(BaseModel):
     end_time: datetime
     reason: BlockReason = BlockReason.MAINTENANCE
 
-    @field_validator("reason", mode="before")
+    @field_validator("start_time", "end_time", mode="after")
     @classmethod
+    def localize_block_times(cls, v: datetime) -> datetime:
+        return ensure_warsaw(v)
     def normalize_reason(cls, v):
         if isinstance(v, str):
             for member in BlockReason:

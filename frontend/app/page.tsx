@@ -414,8 +414,8 @@ useEffect(() => {
         signal: controller.signal,
         body: JSON.stringify({
           machine_id: selectedMachine.id,
-          start_time: `${date}T${startHour}:00Z`,
-          end_time: `${date}T${endHour}:00Z`,
+          start_time: `${date}T${startHour}:00`,
+          end_time: `${date}T${endHour}:00`,
           with_operator: withOperator,
           with_transport: withTransport,
           delivery_address: withTransport ? address : null,
@@ -483,8 +483,8 @@ useEffect(() => {
         headers: authHeaders(),
         body: JSON.stringify({
           machine_id: selectedMachine.id,
-          start_time: `${date}T${startHour}:00Z`,
-          end_time: `${date}T${endHour}:00Z`,
+          start_time: `${date}T${startHour}:00`,
+          end_time: `${date}T${endHour}:00`,
           with_operator: withOperator,
           with_transport: withTransport,
           delivery_address: withTransport ? address : null,
@@ -522,8 +522,8 @@ useEffect(() => {
         headers: authHeaders(),
         body: JSON.stringify({
           machine_id: blockMachineId,
-          start_time: `${blockDate}T00:00:00Z`,
-          end_time: `${blockDate}T23:59:00Z`,
+          start_time: `${blockDate}T00:00:00`,
+          end_time: `${blockDate}T23:59:00`,
           reason: blockReason,
         }),
       });
@@ -681,8 +681,8 @@ useEffect(() => {
       return { available: true, label: "Dostępna", dot: "bg-emerald-400", text: "text-emerald-400" };
     }
 
-    const reqStart = new Date(`${date}T${startHour}:00Z`).getTime();
-    const reqEnd = new Date(`${date}T${endHour}:00Z`).getTime();
+    const reqStart = new Date(`${date}T${startHour}:00`).getTime();
+    const reqEnd = new Date(`${date}T${endHour}:00`).getTime();
     if (isNaN(reqStart) || isNaN(reqEnd) || reqEnd <= reqStart) {
       return { available: true, label: "Dostępna", dot: "bg-emerald-400", text: "text-emerald-400" };
     }
