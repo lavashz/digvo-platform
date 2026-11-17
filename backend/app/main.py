@@ -16,7 +16,7 @@ from app.models import (
     UnavailabilityBlock, HandoverProtocol, Qualification
 )
 from app.schemas import (
-    BookingCreate, BookingResponse, BookingStatusUpdate,
+    BookingCreate, BookingResponse, BookingQuoteResponse, BookingStatusUpdate,
     HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse
 )
 from app.auth import verify_password, create_access_token, get_current_user
@@ -154,6 +154,108 @@ def list_machines(db: Session = Depends(get_db)):
         }
         for m in machines
     ]
+    
+
+@app.post("/bookings/quote", response_model=BookingQuoteResponse)
+def quote_booking(payload: BookingCreate, db: Session = Depends(get_db)):
+    if payload.end_time <= payload.start_time:
+        raise HTTPException(status_code=400, detail="Data zakończenia musi być późniejsza niż rozpoczęcia.")
+
+    machine = db.execute(
+        select(Machine)
+        .options(joinedload(Machine.organization))
+        .where(Machine.id == payload.machine_id)
+    ).scalars().first()
+    if not machine:
+        raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
+
+    unavailable_reason = None
+
+    if machine.udt_valid_until and machine.udt_valid_until < payload.end_time.date():
+        unavailable_reason = f"Maszyna ma nieważny przegląd UDT (ważny do {machine.udt_valid_until.isoformat()})."
+
+    buffer = timedelta(hours=machine.service_buffer_hours)
+    if not unavailable_reason:
+        machine_block = db.execute(
+            select(UnavailabilityBlock).where(
+                UnavailabilityBlock.machine_id == payload.machine_id,
+                UnavailabilityBlock.start_time < payload.end_time + buffer,
+                UnavailabilityBlock.end_time > payload.start_time,
+            ).limit(1)
+        ).scalars().first()
+        if machine_block:
+            unavailable_reason = f"Maszyna jest zablokowana serwisowo ({machine_block.reason.value}) w tym terminie."
+
+    if not unavailable_reason:
+        buffered_conflict = db.execute(
+            select(Booking).where(
+                Booking.machine_id == machine.id,
+                Booking.status != BookingStatus.CANCELLED,
+                Booking.start_time < payload.end_time + buffer,
+                Booking.end_time > payload.start_time - buffer,
+            ).limit(1)
+        ).scalars().first()
+        if buffered_conflict:
+            unavailable_reason = f"Maszyna niedostępna — wymagany bufor serwisowy {machine.service_buffer_hours} h."
+
+    assigned_op = None
+    if payload.with_operator and not unavailable_reason:
+        assigned_op = find_available_operator(db, machine, payload.start_time, payload.end_time)
+        if not assigned_op:
+            unavailable_reason = "Brak wolnego operatora z wymaganymi uprawnieniami UDT w tym terminie."
+
+    if payload.with_transport and not unavailable_reason:
+        assigned_vehicle = find_available_transport(db, machine, payload.start_time, payload.end_time)
+        if not assigned_vehicle:
+            unavailable_reason = "Brak wolnego pojazdu transportowego u tego dostawcy w wybranym terminie."
+
+    total_hours = Decimal(str((payload.end_time - payload.start_time).total_seconds() / 3600))
+    rental_days = max(Decimal("1"), Decimal(str(math.ceil(float(total_hours) / 24))))
+    machine_cost = (rental_days * machine.daily_rate_net).quantize(Decimal("0.01"))
+
+    operator_rate = assigned_op.hourly_rate_net if assigned_op else Decimal("0.00")
+    # do podglądu stawki, gdy operator jeszcze nieprzypisany: weź pierwszą aktywną stawkę dostawcy
+    if payload.with_operator and assigned_op is None:
+        preview_op = db.execute(
+            select(OperatorProfile).where(
+                OperatorProfile.organization_id == machine.organization_id,
+                OperatorProfile.is_active == True,
+            ).limit(1)
+        ).scalars().first()
+        if preview_op:
+            operator_rate = preview_op.hourly_rate_net
+
+    operator_cost = (total_hours * operator_rate).quantize(Decimal("0.01")) if payload.with_operator else Decimal("0.00")
+
+    transport_cost = Decimal("0.00")
+    distance_km = None
+    org = machine.organization
+    if payload.with_transport and payload.delivery_lat and payload.delivery_lng and org and org.base_lat:
+        distance_km = calculate_distance_km(
+            float(org.base_lat),
+            float(org.base_lng),
+            float(payload.delivery_lat),
+            float(payload.delivery_lng),
+        )
+        transport_cost = (Decimal(str(distance_km * 2)) * machine.transport_rate_per_km).quantize(Decimal("0.01"))
+
+    total_net = (machine_cost + operator_cost + transport_cost).quantize(Decimal("0.01"))
+    total_gross = (total_net * Decimal("1.23")).quantize(Decimal("0.01"))
+
+    return BookingQuoteResponse(
+        hours=float(total_hours),
+        days=int(rental_days),
+        machine_cost=machine_cost,
+        operator_cost=operator_cost,
+        operator_hourly_rate=operator_rate if payload.with_operator else None,
+        transport_cost=transport_cost,
+        distance_km_one_way=distance_km,
+        total_net=total_net,
+        total_gross=total_gross,
+        deposit_amount=machine.deposit_amount,
+        available=unavailable_reason is None,
+        unavailable_reason=unavailable_reason,
+    )
 
 
 @app.post("/bookings", response_model=BookingResponse, status_code=201)

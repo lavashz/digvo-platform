@@ -30,6 +30,21 @@ interface Machine {
   service_buffer_hours: number;
 }
 
+interface BookingQuote {
+  hours: number;
+  days: number;
+  machine_cost: number;
+  operator_cost: number;
+  operator_hourly_rate: number | null;
+  transport_cost: number;
+  distance_km_one_way: number | null;
+  total_net: number;
+  total_gross: number;
+  deposit_amount: number;
+  available: boolean;
+  unavailable_reason: string | null;
+}
+
 interface Protocol {
   protocol_type: "PICKUP" | "RETURN";
   engine_hours_reading: number;
@@ -157,6 +172,8 @@ export default function DigvoDashboard() {
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
   const [blocks, setBlocks] = useState<UnavailabilityBlock[]>([]);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  const [quote, setQuote] = useState<BookingQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
 
   // Konfigurator wynajmu
   const [date, setDate] = useState("2026-11-26");
@@ -318,33 +335,60 @@ export default function DigvoDashboard() {
     ...(authUser ? { Authorization: `Bearer ${authUser.token}` } : {}),
   });
 
-  const calculateEstimate = () => {
-    if (!selectedMachine) {
-      return { hours: 0, days: 1, machineCost: 0, operatorCost: 0, transportCost: 0, totalNet: 0, totalGross: 0 };
+  const estimate = {
+  hours: quote?.hours ?? 0,
+  days: quote?.days ?? 1,
+  machineCost: quote?.machine_cost ?? 0,
+  operatorCost: quote?.operator_cost ?? 0,
+  transportCost: quote?.transport_cost ?? 0,
+  totalNet: quote?.total_net ?? 0,
+  totalGross: quote?.total_gross ?? 0,
+};
+
+useEffect(() => {
+  if (!selectedMachine) {
+    setQuote(null);
+    return;
+  }
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(async () => {
+    setQuoteLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/bookings/quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          machine_id: selectedMachine.id,
+          start_time: `${date}T${startHour}:00Z`,
+          end_time: `${date}T${endHour}:00Z`,
+          with_operator: withOperator,
+          with_transport: withTransport,
+          delivery_address: withTransport ? address : null,
+          delivery_lat: withTransport ? 53.126 : null,
+          delivery_lng: withTransport ? 18.045 : null,
+          has_damage_waiver: false,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setQuote(null);
+        return;
+      }
+      setQuote(data);
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") setQuote(null);
+    } finally {
+      setQuoteLoading(false);
     }
-    const [sh, sm] = startHour.split(":").map(Number);
-    const [eh, em] = endHour.split(":").map(Number);
-    const hours = Math.max(0, eh + em / 60 - (sh + sm / 60));
-    const days = Math.max(1, Math.ceil(hours / 24));
+  }, 300);
 
-    const machineCost = days * selectedMachine.daily_rate_net;
-    const operatorCost = withOperator ? hours * 65 : 0;
-    const transportCost = withTransport ? 3.1 * 2 * selectedMachine.transport_rate_per_km : 0;
-    const totalNet = machineCost + operatorCost + transportCost;
-    const totalGross = totalNet * 1.23;
-
-    return {
-      hours: Number(hours.toFixed(1)),
-      days,
-      machineCost: Number(machineCost.toFixed(2)),
-      operatorCost: Number(operatorCost.toFixed(2)),
-      transportCost: Number(transportCost.toFixed(2)),
-      totalNet: Number(totalNet.toFixed(2)),
-      totalGross: Number(totalGross.toFixed(2)),
-    };
+  return () => {
+    controller.abort();
+    window.clearTimeout(timer);
   };
-
-  const estimate = calculateEstimate();
+}, [selectedMachine, date, startHour, endHour, withOperator, withTransport, address]);
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1155,7 +1199,7 @@ export default function DigvoDashboard() {
                               icon={<HardHatIcon className="w-5 h-5" />}
                               title="Operator z uprawnieniami UDT"
                               subtitle="Certyfikowany operator z bazy dostawcy"
-                              price="65 zł/h"
+                              price={`${quote?.operator_hourly_rate ?? "…"} zł/h`}
                             />
                             <ToggleRow
                               checked={withTransport}
@@ -1214,6 +1258,20 @@ export default function DigvoDashboard() {
                               <span className="tabular-nums">{selectedMachine.deposit_amount} zł</span>
                             </div>
                           </div>
+
+                          {quoteLoading && (
+                              <p className="text-xs text-zinc-500">Przeliczanie wyceny z serwera…</p>
+                            )}
+                            {quote && !quote.available && quote.unavailable_reason && (
+                              <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                                {quote.unavailable_reason}
+                              </p>
+                            )}
+                            {quote?.distance_km_one_way != null && withTransport && (
+                              <p className="text-[11px] text-zinc-500">
+                                Dystans (jedna strona, z bazy dostawcy): {quote.distance_km_one_way} km
+                              </p>
+                            )}
 
                           <button
                             type="submit"

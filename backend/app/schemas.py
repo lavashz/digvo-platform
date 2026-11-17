@@ -32,6 +32,21 @@ class BookingResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        
+
+class BookingQuoteResponse(BaseModel):
+    hours: float
+    days: int
+    machine_cost: Decimal
+    operator_cost: Decimal
+    operator_hourly_rate: Decimal | None = None
+    transport_cost: Decimal
+    distance_km_one_way: float | None = None
+    total_net: Decimal
+    total_gross: Decimal
+    deposit_amount: Decimal
+    available: bool = True
+    unavailable_reason: str | None = None
 
 
 class BookingStatusUpdate(BaseModel):
