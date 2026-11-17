@@ -39,6 +39,9 @@ class Organization(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     tax_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
     is_vendor: Mapped[bool] = mapped_column(Boolean, default=False)
+    short_name: Mapped[str | None] = mapped_column(String(128))
+    district: Mapped[str | None] = mapped_column(String(255))
+    rating: Mapped[Decimal | None] = mapped_column(Numeric(2, 1), default=Decimal("4.8"))
     oc_policy_url: Mapped[str | None] = mapped_column(String(512))
     oc_valid_until: Mapped[date | None] = mapped_column(Date)
     base_lat: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
@@ -135,7 +138,7 @@ class Booking(Base):
     status: Mapped[BookingStatus] = mapped_column(Enum(BookingStatus), default=BookingStatus.PENDING)
     contract_pdf_url: Mapped[str | None] = mapped_column(String(512))
 
-    # Gwarancja braku nakładania się rezerwacji dla tej samej maszyny na poziomie PostgreSQL
+    # Brak nakładania się rezerwacji: maszyna i (opcjonalnie) operator — na poziomie PostgreSQL
     __table_args__ = (
         ExcludeConstraint(
             ("machine_id", "="),
@@ -143,6 +146,13 @@ class Booking(Base):
             name="excl_machine_booking_overlap",
             using="gist",
             where=text("status != 'CANCELLED'"),
+        ),
+        ExcludeConstraint(
+            ("operator_id", "="),
+            (func.tstzrange(start_time, end_time, "[)"), "&&"),
+            name="excl_operator_booking_overlap",
+            using="gist",
+            where=text("status != 'CANCELLED' AND operator_id IS NOT NULL"),
         ),
     )
 

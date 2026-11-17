@@ -1,0 +1,13 @@
+---
+description: User exclusively performs git push; agent must never push
+alwaysApply: true
+---
+
+# Git: no push by the agent
+
+The user performs **all** `git push` operations personally.
+
+- **Never** run `git push`, `git push -u`, or any remote-updating push variant.
+- Do not offer to push unless the user explicitly asks — and even then, remind them that pushes are theirs only, unless they clearly override this rule in that message.
+- Commits are still only when the user asks (existing project convention).
+- After commits, stop at local commit and leave push to the user.

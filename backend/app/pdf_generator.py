@@ -21,7 +21,8 @@ def generate_booking_pdf(
     machine: Machine,
     client: User | None,
     operator: User | None,
-    protocols: list[HandoverProtocol]
+    protocols: list[HandoverProtocol],
+    vendor_name: str = "Dostawca Digvo",
 ) -> bytes:
     pdf = FPDF()
     pdf.add_page()
@@ -41,7 +42,7 @@ def generate_booking_pdf(
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "1. STRONY UMOWY", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, "Wynajmujacy: GRASER Sp. z o.o. - Oddzial Bydgoszcz (Operator platformy Digvo)", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, clean_pl(f"Wynajmujacy: {vendor_name} (przez platforme Digvo)"), new_x="LMARGIN", new_y="NEXT")
     client_label = f"{client.full_name} ({client.email})" if client else "Klient zarejestrowany"
     pdf.cell(0, 6, clean_pl(f"Najemca: {client_label}"), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
@@ -58,7 +59,7 @@ def generate_booking_pdf(
     )
     op_label = f"{operator.full_name} (Uprawnienia UDT)" if operator else "Najem bez operatora"
     pdf.cell(0, 6, clean_pl(f"Operator: {op_label}"), new_x="LMARGIN", new_y="NEXT")
-    loc_label = booking.delivery_address if booking.with_transport else "Odbior wlasny z bazy Graser Bydgoszcz"
+    loc_label = booking.delivery_address if booking.with_transport else f"Odbior wlasny z bazy {vendor_name}"
     pdf.cell(0, 6, clean_pl(f"Miejsce dostawy: {loc_label}"), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
@@ -97,7 +98,7 @@ def generate_booking_pdf(
     pdf.set_font("Helvetica", "", 9)
     pdf.cell(90, 6, "............................................................", new_x="RIGHT", new_y="TOP")
     pdf.cell(0, 6, "............................................................", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(90, 5, "Podpis przedstawiciela Graser / Operatora", new_x="RIGHT", new_y="TOP")
+    pdf.cell(90, 5, clean_pl(f"Podpis przedstawiciela {vendor_name} / Operatora"), new_x="RIGHT", new_y="TOP")
     pdf.cell(0, 5, "Podpis Najemcy (Kierownika Budowy)", new_x="LMARGIN", new_y="NEXT")
 
     return bytes(pdf.output())
