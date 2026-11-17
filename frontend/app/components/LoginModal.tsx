@@ -18,6 +18,13 @@ export interface DemoAccount {
   role: string;
 }
 
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  full_name: string;
+  phone: string;
+}
+
 interface LoginModalProps {
   open: boolean;
   onClose: () => void;
@@ -25,6 +32,7 @@ interface LoginModalProps {
   error: string | null;
   onClearError: () => void;
   onLogin: (email: string, password: string) => Promise<boolean>;
+  onRegister: (payload: RegisterPayload) => Promise<boolean>;
   onQuickLogin: (email: string) => Promise<boolean>;
 }
 
@@ -55,10 +63,14 @@ export default function LoginModal({
   error,
   onClearError,
   onLogin,
+  onRegister,
   onQuickLogin,
 }: LoginModalProps) {
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
@@ -81,6 +93,15 @@ export default function LoginModal({
     };
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open) {
+      setMode("login");
+      setPassword("");
+      setFullName("");
+      setPhone("");
+    }
+  }, [open]);
+
   const visibleAccounts = useMemo(
     () => accounts.filter((a) => a.role === roleTab),
     [accounts, roleTab]
@@ -92,7 +113,15 @@ export default function LoginModal({
     e.preventDefault();
     if (busy) return;
     setBusy(true);
-    const ok = await onLogin(email.trim(), password);
+    const ok =
+      mode === "login"
+        ? await onLogin(email.trim(), password)
+        : await onRegister({
+            email: email.trim(),
+            password,
+            full_name: fullName.trim(),
+            phone: phone.trim(),
+          });
     setBusy(false);
     if (ok) setPassword("");
   };
@@ -133,13 +162,77 @@ export default function LoginModal({
             D
           </div>
           <h2 id="login-title" className="mt-5 text-[1.75rem] font-semibold tracking-tight text-white leading-tight">
-            Zaloguj się do Digvo
+            {mode === "login" ? "Zaloguj się do Digvo" : "Załóż konto klienta"}
           </h2>
           <p className="mt-1.5 text-sm text-zinc-400 leading-relaxed">
-            Rezerwuj sprzęt, zarządzaj flotą i pobieraj umowy PDF z jednego konta.
+            {mode === "login"
+              ? "Rezerwuj sprzęt, zarządzaj flotą i pobieraj umowy PDF z jednego konta."
+              : "Rejestracja B2C/B2B — od razu możesz składać rezerwacje i pobierać PDF."}
           </p>
 
-          <form onSubmit={submit} className="mt-7 space-y-3">
+          <div className="mt-5 flex p-1 bg-black/40 border border-white/[0.08] rounded-full">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                onClearError();
+              }}
+              className={`flex-1 text-xs py-1.5 rounded-full font-medium transition ${
+                mode === "login" ? "bg-white text-black shadow-sm" : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              Logowanie
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("register");
+                onClearError();
+              }}
+              className={`flex-1 text-xs py-1.5 rounded-full font-medium transition ${
+                mode === "register" ? "bg-white text-black shadow-sm" : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              Rejestracja
+            </button>
+          </div>
+
+          <form onSubmit={submit} className="mt-5 space-y-3">
+            {mode === "register" && (
+              <>
+                <label className="block">
+                  <span className="sr-only">Imię i nazwisko</span>
+                  <input
+                    type="text"
+                    autoComplete="name"
+                    value={fullName}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      if (error) onClearError();
+                    }}
+                    placeholder="Imię i nazwisko / nazwa firmy"
+                    required
+                    className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
+                  />
+                </label>
+                <label className="block">
+                  <span className="sr-only">Telefon</span>
+                  <input
+                    type="tel"
+                    autoComplete="tel"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (error) onClearError();
+                    }}
+                    placeholder="Telefon (+48 …)"
+                    required
+                    className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
+                  />
+                </label>
+              </>
+            )}
+
             <label className="block">
               <span className="sr-only">Adres e-mail</span>
               <div className="relative">
@@ -167,14 +260,15 @@ export default function LoginModal({
                 <LockIcon className="w-[18px] h-[18px] text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
                     if (error) onClearError();
                   }}
-                  placeholder="Hasło"
+                  placeholder={mode === "login" ? "Hasło" : "Hasło (min. 6 znaków)"}
                   required
+                  minLength={mode === "register" ? 6 : undefined}
                   className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl pl-11 pr-12 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
                 />
                 <button
@@ -200,71 +294,82 @@ export default function LoginModal({
 
             <button
               type="submit"
-              disabled={busy || !email || !password}
+              disabled={
+                busy ||
+                !email ||
+                !password ||
+                (mode === "register" && (!fullName || !phone || password.length < 6))
+              }
               className="w-full mt-1 bg-brand hover:bg-brand-soft disabled:opacity-40 disabled:hover:bg-brand text-black font-semibold rounded-full py-3.5 text-[15px] transition press flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
             >
               {busy ? (
                 <>
-                  <SpinnerIcon className="w-4 h-4" /> Logowanie…
+                  <SpinnerIcon className="w-4 h-4" /> {mode === "login" ? "Logowanie…" : "Tworzenie konta…"}
                 </>
-              ) : (
+              ) : mode === "login" ? (
                 "Zaloguj się"
+              ) : (
+                "Zarejestruj i zaloguj"
               )}
             </button>
           </form>
 
-          <div className="flex items-center gap-3 my-6">
-            <span className="h-px flex-1 bg-white/[0.08]" />
-            <span className="text-[11px] uppercase tracking-[0.16em] text-zinc-500 font-medium">
-              lub konto demonstracyjne
-            </span>
-            <span className="h-px flex-1 bg-white/[0.08]" />
-          </div>
+          {mode === "login" && (
+            <>
+              <div className="flex items-center gap-3 my-6">
+                <span className="h-px flex-1 bg-white/[0.08]" />
+                <span className="text-[11px] uppercase tracking-[0.16em] text-zinc-500 font-medium">
+                  lub konto demonstracyjne
+                </span>
+                <span className="h-px flex-1 bg-white/[0.08]" />
+              </div>
 
-          <div className="flex p-1 bg-black/40 border border-white/[0.08] rounded-full">
-            {ROLE_TABS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setRoleTab(t.key)}
-                className={`flex-1 text-xs py-1.5 rounded-full font-medium transition ${
-                  roleTab === t.key ? "bg-white text-black shadow-sm" : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          <ul className="mt-3 space-y-1.5">
-            {visibleAccounts.map((acc) => {
-              const { kind, name } = splitLabel(acc.label);
-              const loading = busyEmail === acc.email;
-              return (
-                <li key={acc.email}>
+              <div className="flex p-1 bg-black/40 border border-white/[0.08] rounded-full">
+                {ROLE_TABS.map((t) => (
                   <button
+                    key={t.key}
                     type="button"
-                    onClick={() => quick(acc.email)}
-                    disabled={!!busyEmail || busy}
-                    className="group w-full flex items-center gap-3 text-left rounded-2xl px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] border border-transparent hover:border-white/[0.1] transition press disabled:opacity-60"
+                    onClick={() => setRoleTab(t.key)}
+                    className={`flex-1 text-xs py-1.5 rounded-full font-medium transition ${
+                      roleTab === t.key ? "bg-white text-black shadow-sm" : "text-zinc-400 hover:text-white"
+                    }`}
                   >
-                    <span className="w-10 h-10 rounded-full bg-linear-to-br from-brand-soft to-orange-500 text-black text-[13px] font-bold flex items-center justify-center shrink-0">
-                      {initials(name)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-white truncate">{name}</span>
-                      <span className="block text-[11px] text-zinc-500 truncate">{kind || acc.role}</span>
-                    </span>
-                    {loading ? (
-                      <SpinnerIcon className="w-4 h-4 text-zinc-400" />
-                    ) : (
-                      <ChevronRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300 group-hover:translate-x-0.5 transition" />
-                    )}
+                    {t.label}
                   </button>
-                </li>
-              );
-            })}
-          </ul>
+                ))}
+              </div>
+
+              <ul className="mt-3 space-y-1.5">
+                {visibleAccounts.map((acc) => {
+                  const { kind, name } = splitLabel(acc.label);
+                  const loading = busyEmail === acc.email;
+                  return (
+                    <li key={acc.email}>
+                      <button
+                        type="button"
+                        onClick={() => quick(acc.email)}
+                        disabled={!!busyEmail || busy}
+                        className="group w-full flex items-center gap-3 text-left rounded-2xl px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] border border-transparent hover:border-white/[0.1] transition press disabled:opacity-60"
+                      >
+                        <span className="w-10 h-10 rounded-full bg-linear-to-br from-brand-soft to-orange-500 text-black text-[13px] font-bold flex items-center justify-center shrink-0">
+                          {initials(name)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium text-white truncate">{name}</span>
+                          <span className="block text-[11px] text-zinc-500 truncate">{kind || acc.role}</span>
+                        </span>
+                        {loading ? (
+                          <SpinnerIcon className="w-4 h-4 text-zinc-400" />
+                        ) : (
+                          <ChevronRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300 group-hover:translate-x-0.5 transition" />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
 
           <p className="mt-6 flex items-center justify-center gap-1.5 text-[11px] text-zinc-500">
             <ShieldIcon className="w-3.5 h-3.5" />

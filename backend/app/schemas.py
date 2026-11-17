@@ -88,6 +88,9 @@ class BlockCreate(BaseModel):
     @classmethod
     def localize_block_times(cls, v: datetime) -> datetime:
         return ensure_warsaw(v)
+
+    @field_validator("reason", mode="before")
+    @classmethod
     def normalize_reason(cls, v):
         if isinstance(v, str):
             for member in BlockReason:
@@ -107,6 +110,13 @@ class MachineCreate(BaseModel):
     deposit_amount: Decimal
     transport_rate_per_km: Decimal = Decimal("14.00")
     service_buffer_hours: int = 2
+    
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=6)
+    full_name: str = Field(min_length=2, max_length=255)
+    phone: str = Field(min_length=6, max_length=32)
 
 
 class TokenResponse(BaseModel):

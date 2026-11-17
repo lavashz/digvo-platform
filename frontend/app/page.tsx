@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import LoginModal from "./components/LoginModal";
+import LoginModal, { type RegisterPayload } from "./components/LoginModal";
 import {
   ArrowRightIcon,
   CalendarIcon,
@@ -368,6 +368,38 @@ export default function DigvoDashboard() {
       return false;
     }
   };
+
+  const performRegister = async (payload: RegisterPayload): Promise<boolean> => {
+  setMessage(null);
+  setLoginError(null);
+  try {
+    const res = await fetch(`${API_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setLoginError(formatApiError(data.detail, "Błąd rejestracji."));
+      return false;
+    }
+    const userObj: AuthUser = {
+      token: data.access_token,
+      full_name: data.full_name,
+      role: data.role,
+    };
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userObj));
+    setAuthUser(userObj);
+    setActiveTab("client");
+    await fetchMyBookings(data.access_token);
+    setShowLogin(false);
+    setMessage({ type: "success", text: `Konto utworzone. Zalogowano jako ${data.full_name}` });
+    return true;
+  } catch {
+    setLoginError("Błąd połączenia z serwerem przy rejestracji.");
+    return false;
+  }
+};
 
   const handleQuickAccountSelect = async (selectedEmail: string): Promise<boolean> => {
     if (!selectedEmail) return false;
@@ -2022,6 +2054,7 @@ useEffect(() => {
         error={loginError}
         onClearError={clearLoginError}
         onLogin={performLogin}
+        onRegister={performRegister}
         onQuickLogin={handleQuickAccountSelect}
       />
     </div>

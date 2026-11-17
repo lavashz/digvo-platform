@@ -17,9 +17,9 @@ from app.models import (
 )
 from app.schemas import (
     BookingCreate, BookingResponse, BookingQuoteResponse, BookingStatusUpdate,
-    HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse
+    HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse, RegisterRequest
 )
-from app.auth import verify_password, create_access_token, get_current_user
+from app.auth import verify_password, create_access_token, get_current_user, hash_password
 
 app = FastAPI(
     title="Digvo API",
@@ -263,6 +263,34 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         user_id=user.id,
         full_name=user.full_name,
         role=user.role.value
+    )
+    
+
+@app.post("/auth/register", response_model=TokenResponse, status_code=201)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    email = payload.email.strip().lower()
+    existing = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Konto z tym adresem e-mail już istnieje.")
+
+    user = User(
+        email=email,
+        password_hash=hash_password(payload.password),
+        full_name=payload.full_name.strip(),
+        phone=payload.phone.strip(),
+        role=UserRole.CLIENT,
+        organization_id=None,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(user.id, user.role.value)
+    return TokenResponse(
+        access_token=token,
+        user_id=user.id,
+        full_name=user.full_name,
+        role=user.role.value,
     )
 
 
