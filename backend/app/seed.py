@@ -30,14 +30,30 @@ def get_or_create_qual(db, code: str, name: str) -> Qualification:
 
 
 def get_or_create_user(db, email: str, **kwargs) -> User:
+    # stare adresy demo → szukamy też po nich, żeby nie robić drugiego INSERT
+    legacy = {
+        "dyspozytor@kujawy-maszyny.pl": "dyspozytor@graser-bydgoszcz.pl",
+        "j.kowalski@kujawy-maszyny.pl": "j.kowalski@graser-bydgoszcz.pl",
+        "p.nowak@terrarent-bydgoszcz.pl": "p.nowak@graser-bydgoszcz.pl",
+    }
+
     user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
     if not user:
-        user = User(email=email, **kwargs)
-        db.add(user)
-        db.flush()
-    else:
+        old_email = legacy.get(email)
+        if old_email:
+            user = db.execute(select(User).where(User.email == old_email)).scalar_one_or_none()
+            if user:
+                user.email = email
+
+    if user:
         for key, value in kwargs.items():
             setattr(user, key, value)
+        db.flush()
+        return user
+
+    user = User(email=email, **kwargs)
+    db.add(user)
+    db.flush()
     return user
 
 
@@ -53,23 +69,9 @@ def get_or_create_machine(db, name: str, **kwargs) -> Machine:
     return machine
 
 
-def migrate_demo_emails(db):
-    mapping = {
-        "dyspozytor@graser-bydgoszcz.pl": "dyspozytor@kujawy-maszyny.pl",
-        "j.kowalski@graser-bydgoszcz.pl": "j.kowalski@kujawy-maszyny.pl",
-        "p.nowak@graser-bydgoszcz.pl": "p.nowak@terrarent-bydgoszcz.pl",
-    }
-    for old_email, new_email in mapping.items():
-        existing_new = db.execute(select(User).where(User.email == new_email)).scalar_one_or_none()
-        old_user = db.execute(select(User).where(User.email == old_email)).scalar_one_or_none()
-        if old_user and not existing_new:
-            old_user.email = new_email
-
-
 def run_seed():
     db = SessionLocal()
     try:
-        migrate_demo_emails(db)
 
         kujawy = get_or_create_org(
             db,
