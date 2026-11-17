@@ -121,6 +121,31 @@ def health_check():
     return {"status": "ok", "service": "Digvo Backend API v1.0 (JWT Protected)"}
 
 
+@app.get("/fx/eur")
+def get_eur_rate():
+    """Kurs EUR/PLN z NBP (tabela A) — do wielowalutowości marketplace."""
+    import json
+    from urllib.request import urlopen, Request
+
+    try:
+        req = Request(
+            "https://api.nbp.pl/api/exchangerates/rates/a/eur/?format=json",
+            headers={"Accept": "application/json", "User-Agent": "Digvo/1.0"},
+        )
+        with urlopen(req, timeout=8) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        rate = float(payload["rates"][0]["mid"])
+        return {
+            "currency": "EUR",
+            "rate": rate,
+            "date": payload["rates"][0]["effectiveDate"],
+            "source": "NBP",
+        }
+    except Exception:
+        # fallback, żeby UI nie padał przy awarii NBP
+        return {"currency": "EUR", "rate": 4.25, "date": None, "source": "fallback"}
+
+
 @app.post("/auth/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()

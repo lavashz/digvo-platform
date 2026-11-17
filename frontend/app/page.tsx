@@ -17,6 +17,7 @@ import {
   TruckIcon,
   XIcon,
 } from "./components/Icons";
+import { t, formatMoney, type Locale, type Currency } from "./lib/i18n";
 
 interface Machine {
   id: string;
@@ -174,6 +175,10 @@ export default function DigvoDashboard() {
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [quote, setQuote] = useState<BookingQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+
+  const [locale, setLocale] = useState<Locale>("pl");
+  const [currency, setCurrency] = useState<Currency>("PLN");
+  const [eurRate, setEurRate] = useState(4.25);
 
   // Konfigurator wynajmu
   const [date, setDate] = useState("2026-11-26");
@@ -389,6 +394,29 @@ useEffect(() => {
     window.clearTimeout(timer);
   };
 }, [selectedMachine, date, startHour, endHour, withOperator, withTransport, address]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/fx/eur`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.rate) setEurRate(Number(d.rate));
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("digvo_locale", locale);
+    localStorage.setItem("digvo_currency", currency);
+  }, [locale, currency]);
+
+  useEffect(() => {
+    const savedLocale = localStorage.getItem("digvo_locale");
+    const savedCurrency = localStorage.getItem("digvo_currency");
+    if (savedLocale === "pl" || savedLocale === "en") setLocale(savedLocale);
+    if (savedCurrency === "PLN" || savedCurrency === "EUR") setCurrency(savedCurrency);
+  }, []);
+
+  const money = (amountPln: number) => formatMoney(amountPln, currency, eurRate);
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -681,9 +709,9 @@ useEffect(() => {
   const selectedVendor = selectedMachine ? resolveMachineVendor(selectedMachine) : null;
 
   const tabs: { key: "client" | "dispatcher" | "operator"; label: string; count?: number }[] = [
-    { key: "client", label: "Marketplace" },
-    { key: "dispatcher", label: "Dyspozytor", count: bookings.length },
-    { key: "operator", label: "Operator" },
+    { key: "client", label: t(locale, "marketplace") },
+    { key: "dispatcher", label: t(locale, "dispatcher"), count: bookings.length },
+    { key: "operator", label: t(locale, "operator") },
   ];
 
   const renderTabs = (extra: string) => (
@@ -747,6 +775,37 @@ useEffect(() => {
 
           {renderTabs("hidden md:flex")}
 
+          <div className="hidden sm:flex items-center gap-1 mr-1">
+            <div className="flex bg-black/50 border border-white/[0.08] p-0.5 rounded-full">
+              {(["pl", "en"] as Locale[]).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLocale(code)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase ${
+                    locale === code ? "bg-white text-black" : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+            <div className="flex bg-black/50 border border-white/[0.08] p-0.5 rounded-full">
+              {(["PLN", "EUR"] as Currency[]).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setCurrency(code)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                    currency === code ? "bg-white text-black" : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {authUser ? (
             <div className="relative">
               <button
@@ -801,7 +860,7 @@ useEffect(() => {
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-rose-300 hover:bg-rose-500/10 transition text-left"
                     >
                       <LogoutIcon className="w-4 h-4" />
-                      Wyloguj
+                      {t(locale, "logout")}
                     </button>
                   </div>
                 </>
@@ -812,7 +871,7 @@ useEffect(() => {
               onClick={() => setShowLogin(true)}
               className="bg-white hover:bg-zinc-200 text-black text-[13px] font-semibold px-5 py-2 rounded-full transition press"
             >
-              Zaloguj się
+              {t(locale, "login")}
             </button>
           )}
         </div>
@@ -867,16 +926,15 @@ useEffect(() => {
                   className="mt-7 text-[2.6rem] sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.04] animate-fade-up"
                   style={{ animationDelay: "80ms" }}
                 >
-                  <span className="text-gradient">Maszyna. Operator. Transport.</span>
+                  <span className="text-gradient">{t(locale, "heroTitle1")}</span>
                   <br />
-                  <span className="text-gradient-brand">Jedna rezerwacja.</span>
+                  <span className="text-gradient-brand">{t(locale, "heroTitle2")}</span>
                 </h1>
                 <p
                   className="mt-6 mx-auto max-w-2xl text-base sm:text-lg text-zinc-400 leading-relaxed animate-fade-up"
                   style={{ animationDelay: "160ms" }}
                 >
-                  Marketplace floty budowlanej: lokalni dostawcy udostępniają maszyny, a Ty
-                  rezerwujesz sprzęt z operatorem UDT i transportem — umowa PDF w 30 sekund.
+                  {t(locale, "heroSub")}
                 </p>
 
                 <div
@@ -887,7 +945,7 @@ useEffect(() => {
                     href="#katalog"
                     className="inline-flex items-center gap-2 bg-brand hover:bg-brand-soft text-black font-semibold text-sm px-7 py-3.5 rounded-full transition press shadow-lg shadow-brand/20"
                   >
-                    Przeglądaj sprzęt
+                    {t(locale, "browse")}
                     <ArrowRightIcon className="w-4 h-4" />
                   </a>
                   {authUser ? (
@@ -895,14 +953,14 @@ useEffect(() => {
                       href="#rezerwacje"
                       className="inline-flex items-center gap-2 bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white font-medium text-sm px-7 py-3.5 rounded-full transition press"
                     >
-                      Moje rezerwacje
+                      {t(locale, "myBookings")}
                     </a>
                   ) : (
                     <button
                       onClick={() => setShowLogin(true)}
                       className="inline-flex items-center gap-2 bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white font-medium text-sm px-7 py-3.5 rounded-full transition press"
                     >
-                      Zaloguj się
+                      {t(locale, "login")}
                     </button>
                   )}
                 </div>
@@ -912,9 +970,9 @@ useEffect(() => {
                   style={{ animationDelay: "320ms" }}
                 >
                   {[
-                    { value: String(machines.length), label: "Maszyn w bazie", cls: "text-white" },
-                    { value: "3", label: "Oddziały w Bydgoszczy", cls: "text-white" },
-                    { value: "100%", label: "Przeglądy UDT", cls: "text-emerald-400" },
+                    { value: String(machines.length), label: t(locale, "machinesInDb"), cls: "text-white" },
+                    { value: "3", label: t(locale, "vendorsOnMarket"), cls: "text-white" },
+                    { value: "100%", label: t(locale, "udtReviews"), cls: "text-emerald-400" },
                   ].map((s) => (
                     <div key={s.label} className="bg-black/70 backdrop-blur px-3 py-5 sm:py-6">
                       <dt className="sr-only">{s.label}</dt>
@@ -1197,16 +1255,16 @@ useEffect(() => {
                               checked={withOperator}
                               onChange={setWithOperator}
                               icon={<HardHatIcon className="w-5 h-5" />}
-                              title="Operator z uprawnieniami UDT"
-                              subtitle="Certyfikowany operator z bazy dostawcy"
+                              title={t(locale, "withOperator")}
+                              subtitle={t(locale, "withOperatorSub")}
                               price={`${quote?.operator_hourly_rate ?? "…"} zł/h`}
                             />
                             <ToggleRow
                               checked={withTransport}
                               onChange={setWithTransport}
                               icon={<TruckIcon className="w-5 h-5" />}
-                              title="Transport niskopodwoziowy"
-                              subtitle="Dostawa na budowę i odbiór sprzętu"
+                              title={t(locale, "withTransport")}
+                              subtitle={t(locale, "withTransportSub")}
                               price={`${selectedMachine.transport_rate_per_km} zł/km`}
                             />
                           </div>
@@ -1214,7 +1272,7 @@ useEffect(() => {
                           {withTransport && (
                             <label className="block animate-fade-in">
                               <span className="flex items-center gap-1.5 text-[11px] text-zinc-400 mb-1.5">
-                                <PinIcon className="w-3.5 h-3.5" /> Lokalizacja placu budowy
+                                <PinIcon className="w-3.5 h-3.5" /> {t(locale, "siteLocation")}
                               </span>
                               <input
                                 type="text"
@@ -1228,39 +1286,42 @@ useEffect(() => {
 
                           <div className="rounded-2xl bg-black/40 border border-white/[0.07] p-5 space-y-2.5 text-[13px]">
                             <div className="flex justify-between text-zinc-400">
-                              <span>Wynajem maszyny ({estimate.days} doba)</span>
-                              <span className="text-zinc-200 tabular-nums">{estimate.machineCost.toFixed(2)} zł</span>
+                              <span>
+                                {t(locale, "machineRent")} ({estimate.days} {t(locale, "day")})
+                              </span>
+                              <span className="text-zinc-200 tabular-nums">{money(estimate.machineCost)}</span>
                             </div>
                             <div className="flex justify-between text-zinc-400">
-                              <span>Obsługa operatorska ({estimate.hours} h)</span>
-                              <span className="text-zinc-200 tabular-nums">{estimate.operatorCost.toFixed(2)} zł</span>
+                              <span>
+                                {t(locale, "operatorFee")} ({estimate.hours} {t(locale, "hoursShort")})
+                              </span>
+                              <span className="text-zinc-200 tabular-nums">{money(estimate.operatorCost)}</span>
                             </div>
                             <div className="flex justify-between text-zinc-400">
-                              <span>Logistyka (w obie strony)</span>
-                              <span className="text-zinc-200 tabular-nums">{estimate.transportCost.toFixed(2)} zł</span>
+                              <span>{t(locale, "logistics")}</span>
+                              <span className="text-zinc-200 tabular-nums">{money(estimate.transportCost)}</span>
                             </div>
 
                             <div className="pt-3.5 mt-1 border-t border-white/[0.08] flex items-baseline justify-between">
-                              <span className="text-sm font-medium text-zinc-300">Suma netto</span>
+                              <span className="text-sm font-medium text-zinc-300">{t(locale, "netTotal")}</span>
                               <span className="text-3xl font-semibold text-white tracking-tight tabular-nums">
-                                {estimate.totalNet.toFixed(2)}
-                                <span className="text-base text-zinc-400 ml-1">zł</span>
+                                {money(estimate.totalNet)}
                               </span>
                             </div>
                             <div className="flex justify-between text-xs text-zinc-400">
-                              <span>Suma brutto (z 23% VAT)</span>
+                              <span>{t(locale, "grossTotal")}</span>
                               <span className="font-medium text-zinc-300 tabular-nums">
-                                {estimate.totalGross.toFixed(2)} zł
+                                {money(estimate.totalGross)}
                               </span>
                             </div>
                             <div className="flex justify-between text-[11px] text-zinc-500">
-                              <span>Zwrotna kaucja zabezpieczająca</span>
-                              <span className="tabular-nums">{selectedMachine.deposit_amount} zł</span>
+                              <span>{t(locale, "deposit")}</span>
+                              <span className="tabular-nums">{money(selectedMachine.deposit_amount)}</span>
                             </div>
                           </div>
 
                           {quoteLoading && (
-                              <p className="text-xs text-zinc-500">Przeliczanie wyceny z serwera…</p>
+                              <p className="text-xs text-zinc-500">{t(locale, "quoting")}</p>
                             )}
                             {quote && !quote.available && quote.unavailable_reason && (
                               <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
@@ -1269,7 +1330,7 @@ useEffect(() => {
                             )}
                             {quote?.distance_km_one_way != null && withTransport && (
                               <p className="text-[11px] text-zinc-500">
-                                Dystans (jedna strona, z bazy dostawcy): {quote.distance_km_one_way} km
+                                {t(locale, "distanceOneWay")}: {quote.distance_km_one_way} km
                               </p>
                             )}
 
@@ -1286,11 +1347,11 @@ useEffect(() => {
                                 <SpinnerIcon className="w-4 h-4" /> Weryfikacja dostępności w bazie…
                               </>
                             ) : !authUser ? (
-                              "Zaloguj się, aby zarezerwować"
+                              t(locale, "loginToBook")
                             ) : selectedAvailability && !selectedAvailability.available ? (
-                              "Termin zajęty — sprawdź inny dzień"
+                              t(locale, "occupied")
                             ) : (
-                              "Zarezerwuj i wygeneruj umowę"
+                              t(locale, "bookCta")
                             )}
                           </button>
                           <p className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-500">
