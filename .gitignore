@@ -15,3 +15,6 @@ node_modules/
 # Systemowe i IDE
 .DS_Store
 .vscode/
+
+# lokalny backup monolitu — nie commitować
+frontend/app/page.monolith.bak.tsx
