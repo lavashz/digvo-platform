@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-    "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-display), "Space Grotesk", sans-serif;
+  --font-body: var(--font-body), "Source Sans 3", sans-serif;
+  --font-sans: var(--font-body);
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --color-brand: #ffb800;
@@ -23,12 +24,27 @@ html {
 }
 
 body {
-  background: #000;
-  color: #f5f5f7;
-  font-family: var(--font-sans);
+  background: #09090b;
+  color: #f4f4f5;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+.hero-glow {
+  background:
+    radial-gradient(70% 55% at 15% 10%, rgba(255, 184, 0, 0.16), transparent 55%),
+    radial-gradient(50% 45% at 90% 0%, rgba(255, 120, 40, 0.08), transparent 50%),
+    linear-gradient(180deg, #121214 0%, #09090b 72%);
+}
+
+.atmosphere {
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.035) 0.7px, transparent 0.7px);
+  background-size: 22px 22px;
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 ::selection {
@@ -68,7 +84,7 @@ input:-webkit-autofill {
 }
 
 .surface {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
+  background: rgba(14, 14, 16, 0.92);
   border: 1px solid var(--color-line);
 }
 
@@ -215,4 +231,31 @@ input:-webkit-autofill {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Spokojniejszy marketplace */
+.page-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  color: #f5f5f7;
+}
+
+.quiet-divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@keyframes heroDrift {
+  from { transform: scale(1.05) translate3d(0, 0, 0); }
+  to { transform: scale(1.12) translate3d(-1.5%, -1%, 0); }
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+p, li, label, input, select, textarea, button, a, span, td, th {
+  font-family: var(--font-body);
 }
