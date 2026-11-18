@@ -17,7 +17,8 @@ from app.models import (
 )
 from app.schemas import (
     BookingCreate, BookingResponse, BookingQuoteResponse, BookingStatusUpdate,
-    HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse, RegisterRequest
+    HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse, RegisterRequest,
+    WARSAW,
 )
 from app.auth import verify_password, create_access_token, get_current_user, hash_password
 
@@ -316,6 +317,73 @@ def list_machines(db: Session = Depends(get_db)):
         for m in machines
     ]
     
+@app.get("/machines/{machine_id}/availability")
+def machine_availability(
+    machine_id: str,
+    from_date: str,
+    to_date: str,
+    db: Session = Depends(get_db),
+):
+    """Zwraca zajęte dni (rezerwacje + blokady + bufor serwisowy) do oznaczenia w kalendarzu."""
+    try:
+        start_d = datetime.strptime(from_date, "%Y-%m-%d").date()
+        end_d = datetime.strptime(to_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="from_date/to_date w formacie YYYY-MM-DD")
+
+    if end_d < start_d:
+        raise HTTPException(status_code=400, detail="to_date musi być >= from_date")
+
+    machine = db.get(Machine, machine_id)
+    if not machine:
+        raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
+
+    window_start = datetime.combine(start_d, datetime.min.time()).replace(tzinfo=WARSAW)
+    window_end = datetime.combine(end_d, datetime.max.time()).replace(tzinfo=WARSAW)
+    buffer = timedelta(hours=machine.service_buffer_hours)
+
+    bookings = db.execute(
+        select(Booking).where(
+            Booking.machine_id == machine_id,
+            Booking.status != BookingStatus.CANCELLED,
+            Booking.start_time < window_end + buffer,
+            Booking.end_time > window_start - buffer,
+        )
+    ).scalars().all()
+
+    blocks = db.execute(
+        select(UnavailabilityBlock).where(
+            UnavailabilityBlock.machine_id == machine_id,
+            UnavailabilityBlock.start_time < window_end + buffer,
+            UnavailabilityBlock.end_time > window_start - buffer,
+        )
+    ).scalars().all()
+
+    busy: set[str] = set()
+
+    def mark_range(a: datetime, b: datetime):
+        # oznacz każdy dzień kalendarzowy nachodzący na przedział [a, b)
+        cur = a.astimezone(WARSAW).date() if a.tzinfo else a.date()
+        last = (b - timedelta(seconds=1)).astimezone(WARSAW).date() if b.tzinfo else (b - timedelta(seconds=1)).date()
+        d = cur
+        while d <= last:
+            if start_d <= d <= end_d:
+                busy.add(d.isoformat())
+            d += timedelta(days=1)
+
+    for b in bookings:
+        mark_range(b.start_time - buffer, b.end_time + buffer)
+
+    for bl in blocks:
+        mark_range(bl.start_time, bl.end_time + buffer)
+
+    return {
+        "machine_id": machine_id,
+        "from_date": from_date,
+        "to_date": to_date,
+        "service_buffer_hours": machine.service_buffer_hours,
+        "busy_dates": sorted(busy),
+    }
 
 @app.post("/bookings/quote", response_model=BookingQuoteResponse)
 def quote_booking(payload: BookingCreate, db: Session = Depends(get_db)):

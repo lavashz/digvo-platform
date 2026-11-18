@@ -22,6 +22,9 @@ import { t, formatMoney, type Locale, type Currency } from "../lib/i18n";
 import { machineImageUrl } from "../lib/machineImages";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
+import BusyCalendar from "../components/BusyCalendar";
+
+  
 
 function ToggleRow({
   checked,
@@ -94,7 +97,10 @@ function BookingPage() {
   const [machine, setMachine] = useState<Machine | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [date, setDate] = useState("2027-01-10");
+  const [startDate, setStartDate] = useState("2027-01-12");
+  const [endDate, setEndDate] = useState("2027-01-12");
+  const [calMonth, setCalMonth] = useState(() => new Date(2027, 0, 1));
+  const [busyDates, setBusyDates] = useState<Set<string>>(new Set());
   const [startHour, setStartHour] = useState("08:00");
   const [endHour, setEndHour] = useState("16:00");
   const [withOperator, setWithOperator] = useState(true);
@@ -147,6 +153,21 @@ function BookingPage() {
   }, [machineId, locale]);
 
   useEffect(() => {
+    if (!machine) return;
+    const y = calMonth.getFullYear();
+    const m = calMonth.getMonth();
+    const from = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+    const last = new Date(y, m + 1, 0).getDate();
+    const to = `${y}-${String(m + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+    fetch(`${API_URL}/machines/${machine.id}/availability?from_date=${from}&to_date=${to}`)
+        .then((r) => r.json())
+        .then((d) => {
+        setBusyDates(new Set(Array.isArray(d.busy_dates) ? d.busy_dates : []));
+        })
+        .catch(() => setBusyDates(new Set()));
+  }, [machine, calMonth]);
+
+  useEffect(() => {
     if (!machine) {
       setQuote(null);
       return;
@@ -161,8 +182,8 @@ function BookingPage() {
           signal: controller.signal,
           body: JSON.stringify({
             machine_id: machine.id,
-            start_time: `${date}T${startHour}:00`,
-            end_time: `${date}T${endHour}:00`,
+            start_time: `${startDate}T${startHour}:00`,
+            end_time: `${endDate}T${endHour}:00`,
             with_operator: withOperator,
             with_transport: withTransport,
             delivery_address: withTransport ? address : null,
@@ -187,7 +208,7 @@ function BookingPage() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [machine, date, startHour, endHour, withOperator, withTransport, address, deliveryLat, deliveryLng]);
+  }, [machine, startDate, endDate, startHour, endHour, withOperator, withTransport, address, deliveryLat, deliveryLng]);
 
   const vendor = useMemo(() => (machine ? resolveMachineVendor(machine) : null), [machine]);
   const money = (n: number) => formatMoney(n, currency, eurRate);
@@ -200,6 +221,15 @@ function BookingPage() {
     transportCost: quote?.transport_cost ?? 0,
     totalNet: quote?.total_net ?? 0,
     totalGross: quote?.total_gross ?? 0,
+  };
+
+  const pickDay = (isoDay: string) => {
+    if (!startDate || (startDate && endDate && startDate !== endDate) || isoDay < startDate) {
+        setStartDate(isoDay);
+        setEndDate(isoDay);
+        return;
+    }
+    setEndDate(isoDay);
   };
 
   const handleBooking = async (e: FormEvent) => {
@@ -216,8 +246,8 @@ function BookingPage() {
         headers: authHeaders(authUser.token),
         body: JSON.stringify({
           machine_id: machine.id,
-          start_time: `${date}T${startHour}:00`,
-          end_time: `${date}T${endHour}:00`,
+          start_time: `${startDate}T${startHour}:00`,
+          end_time: `${endDate}T${endHour}:00`,
           with_operator: withOperator,
           with_transport: withTransport,
           delivery_address: withTransport ? address : null,
@@ -312,42 +342,83 @@ function BookingPage() {
                 onSubmit={handleBooking}
                 className="rounded-3xl border border-white/[0.09] bg-panel p-6 sm:p-7 space-y-4"
               >
-                <div className="rounded-2xl bg-black/40 border border-white/[0.07] p-4 space-y-3">
-                  <label className="block">
-                    <span className="flex items-center gap-1.5 text-[11px] text-zinc-400 mb-1.5">
-                      <CalendarIcon className="w-3.5 h-3.5" /> Data
-                    </span>
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      className={`${INPUT_CLS} rounded-xl`}
-                      required
+                <div className="grid grid-cols-2 gap-3">
+                    <label className="block text-xs text-zinc-500">
+                        Od dnia
+                        <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                            const v = e.target.value;
+                            setStartDate(v);
+                            if (v > endDate) setEndDate(v);
+                        }}
+                        className={`${INPUT_CLS} mt-1 rounded-full`}
+                        />
+                    </label>
+                    <label className="block text-xs text-zinc-500">
+                        Do dnia
+                        <input
+                        type="date"
+                        value={endDate}
+                        min={startDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className={`${INPUT_CLS} mt-1 rounded-full`}
+                        />
+                    </label>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                    <button
+                        type="button"
+                        className="text-xs text-zinc-400 hover:text-white"
+                        onClick={() =>
+                        setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1))
+                        }
+                    >
+                        ←
+                    </button>
+                    <button
+                        type="button"
+                        className="text-xs text-zinc-400 hover:text-white"
+                        onClick={() =>
+                        setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1))
+                        }
+                    >
+                        →
+                    </button>
+                    </div>
+
+                    <BusyCalendar
+                    month={calMonth}
+                    busyDates={busyDates}
+                    startDate={startDate}
+                    endDate={endDate}
+                    onPick={pickDay}
                     />
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="block">
-                      <span className="block text-[11px] text-zinc-400 mb-1.5">Od</span>
-                      <input
-                        type="time"
-                        value={startHour}
-                        onChange={(e) => setStartHour(e.target.value)}
-                        className={`${INPUT_CLS} rounded-xl`}
-                        required
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="block text-[11px] text-zinc-400 mb-1.5">Do</span>
-                      <input
-                        type="time"
-                        value={endHour}
-                        onChange={(e) => setEndHour(e.target.value)}
-                        className={`${INPUT_CLS} rounded-xl`}
-                        required
-                      />
-                    </label>
-                  </div>
-                </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block text-xs text-zinc-500">
+                          Od (godzina)
+                          <input
+                          type="time"
+                          value={startHour}
+                          onChange={(e) => setStartHour(e.target.value)}
+                          className={`${INPUT_CLS} mt-1 rounded-full`}
+                          required
+                          />
+                      </label>
+                      <label className="block text-xs text-zinc-500">
+                          Do (godzina)
+                          <input
+                          type="time"
+                          value={endHour}
+                          onChange={(e) => setEndHour(e.target.value)}
+                          className={`${INPUT_CLS} mt-1 rounded-full`}
+                          required
+                          />
+                      </label>
+                    </div>
 
                 <ToggleRow
                   checked={withOperator}
