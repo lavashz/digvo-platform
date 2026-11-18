@@ -119,12 +119,12 @@ export default function HomePage() {
                 {t(locale, "browse")}
                 <ArrowRightIcon className="w-4 h-4" />
               </Link>
-              <Link
-                href="/katalog"
+              <a
+                href="#kategorie"
                 className="inline-flex items-center px-5 py-3.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-sm text-white transition"
               >
-                Zobacz dostępność
-              </Link>
+                Zobacz kategorie
+              </a>
             </div>
           </div>
         </section>
@@ -147,7 +147,7 @@ export default function HomePage() {
         </section>
 
         {/* KATEGORIE ZE ZDJĘCIAMI */}
-        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-16">
+        <section id="kategorie" className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-16">
           <div className="flex items-end justify-between gap-4 mb-8">
             <div>
               <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
