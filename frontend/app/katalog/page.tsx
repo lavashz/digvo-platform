@@ -11,6 +11,8 @@ import { DEMO_ACCOUNTS, VENDORS, resolveMachineVendor } from "../lib/vendors";
 import { machineImageUrl } from "../lib/machineImages";
 import type { Machine } from "../lib/types";
 import { t, formatMoney, type Locale, type Currency } from "../lib/i18n";
+import Toast from "../components/Toast";
+import { useFlash } from "../lib/flash";
 
 export default function CatalogPage() {
   const {
@@ -34,6 +36,7 @@ export default function CatalogPage() {
   const [vendorFilter, setVendorFilter] = useState("ALL");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const { flash, show, clear } = useFlash();
 
   useEffect(() => {
     const savedLocale = localStorage.getItem("digvo_locale");
@@ -97,7 +100,10 @@ export default function CatalogPage() {
         onCurrency={setCurrency}
         authUser={authUser}
         onLoginClick={() => setShowLogin(true)}
-        onLogout={logout}
+        onLogout={() => {
+          logout();
+          show("Wylogowano.", "info");
+        }}
       />
 
       <main className="flex-1 relative">
@@ -243,6 +249,8 @@ export default function CatalogPage() {
           </div>
         </div>
       </footer>
+      
+      <Toast flash={flash} onClose={clear} />
 
       <LoginModal
         open={showLogin}

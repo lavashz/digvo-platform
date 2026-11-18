@@ -10,6 +10,8 @@ import { API_URL, authHeaders } from "../lib/api";
 import { DEMO_ACCOUNTS, resolveMachineVendor, statusMeta } from "../lib/vendors";
 import type { Booking, Machine } from "../lib/types";
 import { t, type Locale, type Currency } from "../lib/i18n";
+import Toast from "../components/Toast";
+import { useFlash } from "../lib/flash";
 
 export default function MyBookingsPage() {
   const {
@@ -31,6 +33,7 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(false);
+  const { flash, show, clear } = useFlash();
 
   useEffect(() => {
     const savedLocale = localStorage.getItem("digvo_locale");
@@ -75,30 +78,55 @@ export default function MyBookingsPage() {
         onCurrency={setCurrency}
         authUser={authUser}
         onLoginClick={() => setShowLogin(true)}
-        onLogout={logout}
+        onLogout={() => {
+          logout();
+          show("Wylogowano.", "info");
+        }}
       />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-5 sm:px-8 py-10">
-        <h1 className="text-3xl font-semibold tracking-tight text-white">{t(locale, "myBookings")}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">
+          {t(locale, "myBookings")}
+        </h1>
         <p className="mt-2 text-sm text-zinc-400">Umowy PDF i statusy zleceń</p>
 
-        {!ready ? null : !authUser ? (
-          <div className="mt-10 rounded-3xl border border-white/[0.08] bg-panel p-10 text-center">
-            <p className="text-sm text-zinc-400">Zaloguj się, aby zobaczyć rezerwacje.</p>
+        {!ready ? (
+          <div className="mt-10 space-y-3">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="h-16 rounded-2xl skeleton" />
+            ))}
+          </div>
+        ) : !authUser ? (
+          <div className="mt-10 rounded-3xl border border-white/[0.08] bg-[#111113] p-10 sm:p-14 text-center">
+            <p className="text-lg font-semibold text-white tracking-tight">Zaloguj się</p>
+            <p className="mt-2 text-sm text-zinc-400 max-w-sm mx-auto">
+              Po zalogowaniu zobaczysz tu swoje rezerwacje, statusy i umowy PDF.
+            </p>
             <button
               type="button"
               onClick={() => setShowLogin(true)}
-              className="mt-5 bg-brand text-black font-semibold px-5 py-2.5 rounded-full"
+              className="mt-6 bg-brand hover:bg-brand-soft text-black font-semibold px-6 py-3 rounded-full"
             >
               {t(locale, "login")}
             </button>
           </div>
         ) : loading ? (
-          <p className="mt-10 text-sm text-zinc-500">Ładowanie…</p>
+          <div className="mt-10 space-y-3">
+            {[1, 2, 3, 4].map((n) => (
+              <div key={n} className="h-16 rounded-2xl skeleton" />
+            ))}
+          </div>
         ) : bookings.length === 0 ? (
-          <div className="mt-10 rounded-3xl border border-white/[0.08] bg-panel p-10 text-center">
-            <p className="text-sm text-zinc-400">Brak rezerwacji na koncie {authUser.full_name}.</p>
-            <Link href="/katalog" className="inline-block mt-5 text-brand text-sm font-medium">
+          <div className="mt-10 rounded-3xl border border-dashed border-white/[0.12] bg-[#111113] p-10 sm:p-14 text-center">
+            <p className="text-lg font-semibold text-white tracking-tight">Brak rezerwacji</p>
+            <p className="mt-2 text-sm text-zinc-400 max-w-sm mx-auto">
+              Konto <span className="text-zinc-200">{authUser.full_name}</span> nie ma jeszcze
+              żadnych zleceń. Wybierz maszynę z katalogu.
+            </p>
+            <Link
+              href="/katalog"
+              className="inline-flex mt-6 bg-brand hover:bg-brand-soft text-black font-semibold px-6 py-3 rounded-full text-sm"
+            >
               {t(locale, "browse")} →
             </Link>
           </div>
@@ -137,10 +165,14 @@ export default function MyBookingsPage() {
                         })}
                       </td>
                       <td className="py-4 pr-3 text-xs text-zinc-300">{b.operator_name || "—"}</td>
-                      <td className="py-4 pr-3 text-xs text-zinc-300">{b.delivery_address || "Odbiór z bazy"}</td>
+                      <td className="py-4 pr-3 text-xs text-zinc-300">
+                        {b.delivery_address || "Odbiór z bazy"}
+                      </td>
                       <td className="py-4 pr-3 font-semibold tabular-nums">{b.total_price_net} zł</td>
                       <td className="py-4 pr-3">
-                        <span className={`px-2.5 py-1 rounded-full text-[11px] ${st.cls}`}>{st.label}</span>
+                        <span className={`px-2.5 py-1 rounded-full text-[11px] ${st.cls}`}>
+                          {st.label}
+                        </span>
                       </td>
                       <td className="py-4 text-right">
                         <a
@@ -161,38 +193,38 @@ export default function MyBookingsPage() {
         )}
       </main>
 
-        <footer className="border-t border-white/[0.06] mt-auto">
-            <div className="hazard h-1 opacity-70" />
-            <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-zinc-500">
-                <div>
-                <p className="text-sm text-zinc-300 font-medium">Digvo</p>
-                <p className="mt-1">Krótkoterminowy wynajem maszyn z operatorem i transportem.</p>
-                </div>
-                <div className="flex gap-5">
-                <Link href="/katalog" className="hover:text-white transition">
-                    Katalog
-                </Link>
-                <Link href="/moje-rezerwacje" className="hover:text-white transition">
-                    Moje rezerwacje
-                </Link>
-                <Link href="/" className="hover:text-white transition">
-                    Start
-                </Link>
-                </div>
+      <footer className="border-t border-white/[0.06] mt-auto">
+        <div className="hazard h-1 opacity-70" />
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-zinc-500">
+          <div>
+            <p className="text-sm text-zinc-300 font-medium">Digvo</p>
+            <p className="mt-1">Krótkoterminowy wynajem maszyn z operatorem i transportem.</p>
+          </div>
+          <div className="flex gap-5">
+            <Link href="/katalog" className="hover:text-white transition">
+              Katalog
+            </Link>
+            <Link href="/moje-rezerwacje" className="hover:text-white transition">
+              Moje rezerwacje
+            </Link>
+            <Link href="/" className="hover:text-white transition">
+              Start
+            </Link>
+          </div>
+        </div>
+        <div className="border-t border-white/[0.06] bg-black">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-600">
+            <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
+            <div className="flex flex-wrap gap-x-5 gap-y-1">
+              <span>Platforma demo — praca inżynierska</span>
+              <span>Zdjęcia: Wikimedia Commons (CC)</span>
+              <span>Regulamin</span>
+              <span>Polityka prywatności</span>
             </div>
-            <div className="border-t border-white/[0.06] bg-black">
-                <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-600">
-                <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
-                <div className="flex flex-wrap gap-x-5 gap-y-1">
-                    <span>Platforma demo — praca inżynierska</span>
-                    <span>Zdjęcia: Wikimedia Commons (CC)</span>
-                    <span>Regulamin</span>
-                    <span>Polityka prywatności</span>
-                </div>
-                </div>
-            </div>
-        </footer>
-
+          </div>
+        </div>
+      </footer>
+        <Toast flash={flash} onClose={clear} />
       <LoginModal
         open={showLogin}
         onClose={closeLogin}

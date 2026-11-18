@@ -20,6 +20,8 @@ import { DEMO_ACCOUNTS, INPUT_CLS, SITE_PRESETS, resolveMachineVendor } from "..
 import type { BookingQuote, Machine } from "../lib/types";
 import { t, formatMoney, type Locale, type Currency } from "../lib/i18n";
 import { machineImageUrl } from "../lib/machineImages";
+import Toast from "../components/Toast";
+import { useFlash } from "../lib/flash";
 
 function ToggleRow({
   checked,
@@ -105,7 +107,7 @@ function BookingPage() {
   const [quote, setQuote] = useState<BookingQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const { flash, show, clear } = useFlash();
 
   useEffect(() => {
     const savedLocale = localStorage.getItem("digvo_locale");
@@ -208,7 +210,6 @@ function BookingPage() {
       return;
     }
     setLoading(true);
-    setMessage(null);
     try {
       const res = await fetch(`${API_URL}/bookings`, {
         method: "POST",
@@ -225,21 +226,18 @@ function BookingPage() {
           has_damage_waiver: false,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage({ type: "error", text: formatApiError(data.detail, "Błąd rezerwacji.") });
-      } else {
-        setMessage({
-          type: "success",
-          text: `Potwierdzono. Netto: ${data.total_price_net} PLN.`,
-        });
-        window.setTimeout(() => router.push("/moje-rezerwacje"), 900);
+        const data = await res.json();
+        if (!res.ok) {
+            show(formatApiError(data.detail, "Błąd rezerwacji."), "error");
+        } else {
+            show(`Potwierdzono. Netto: ${data.total_price_net} PLN.`, "success");
+            window.setTimeout(() => router.push("/moje-rezerwacje"), 900);
+        }
+      } catch {
+        show("Błąd sieci przy rezerwacji.", "error");
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setMessage({ type: "error", text: "Błąd sieci przy rezerwacji." });
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -251,7 +249,10 @@ function BookingPage() {
         onCurrency={setCurrency}
         authUser={authUser}
         onLoginClick={() => setShowLogin(true)}
-        onLogout={logout}
+        onLogout={() => {
+          logout();
+          show("Wylogowano.", "info");
+        }}
       />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-5 sm:px-8 py-8 sm:py-12">
@@ -481,18 +482,6 @@ function BookingPage() {
                   </p>
                 )}
 
-                {message && (
-                  <p
-                    className={`text-sm rounded-xl px-3 py-2 ${
-                      message.type === "success"
-                        ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
-                        : "bg-rose-500/10 text-rose-300 border border-rose-500/20"
-                    }`}
-                  >
-                    {message.text}
-                  </p>
-                )}
-
                 <button
                   type="submit"
                   disabled={loading || (quote != null && !quote.available)}
@@ -549,6 +538,7 @@ function BookingPage() {
                 </div>
             </div>
         </footer>
+        <Toast flash={flash} onClose={clear} />
       <LoginModal
         open={showLogin}
         onClose={closeLogin}

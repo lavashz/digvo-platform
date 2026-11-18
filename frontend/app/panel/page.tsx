@@ -10,6 +10,8 @@ import { API_URL, authHeaders, formatApiError } from "../lib/api";
 import { DEMO_ACCOUNTS, INPUT_CLS, statusMeta } from "../lib/vendors";
 import type { Booking, Machine, UnavailabilityBlock } from "../lib/types";
 import { t, type Locale, type Currency } from "../lib/i18n";
+import Toast from "../components/Toast";
+import { useFlash } from "../lib/flash";
 
 export default function PanelPage() {
   const {
@@ -32,7 +34,6 @@ export default function PanelPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [blocks, setBlocks] = useState<UnavailabilityBlock[]>([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [message, setMessage] = useState<string | null>(null);
   const [mthInputs, setMthInputs] = useState<Record<string, string>>({});
 
   const [blockMachineId, setBlockMachineId] = useState("");
@@ -43,6 +44,9 @@ export default function PanelPage() {
   const [newMachineRate, setNewMachineRate] = useState("450");
   const [newMachineDeposit, setNewMachineDeposit] = useState("1000");
   const [newMachineBuffer, setNewMachineBuffer] = useState("2");
+
+  const [loading, setLoading] = useState(false);
+  const { flash, show, clear } = useFlash();
 
   useEffect(() => {
     const savedLocale = localStorage.getItem("digvo_locale");
@@ -57,25 +61,28 @@ export default function PanelPage() {
   }, [locale, currency]);
 
   const reload = async () => {
+    setLoading(true);
     try {
-      const [mRes, bRes, blRes] = await Promise.all([
+        const [mRes, bRes, blRes] = await Promise.all([
         fetch(`${API_URL}/machines`),
         fetch(`${API_URL}/bookings`),
         fetch(`${API_URL}/blocks`),
-      ]);
-      const mData = await mRes.json();
-      const bData = await bRes.json();
-      const blData = await blRes.json();
-      setMachines(Array.isArray(mData) ? mData : []);
-      setBookings(Array.isArray(bData) ? bData : []);
-      setBlocks(Array.isArray(blData) ? blData : []);
-      if (Array.isArray(mData) && mData[0] && !blockMachineId) {
+        ]);
+        const mData = await mRes.json();
+        const bData = await bRes.json();
+        const blData = await blRes.json();
+        setMachines(Array.isArray(mData) ? mData : []);
+        setBookings(Array.isArray(bData) ? bData : []);
+        setBlocks(Array.isArray(blData) ? blData : []);
+        if (Array.isArray(mData) && mData[0] && !blockMachineId) {
         setBlockMachineId(mData[0].id);
-      }
+        }
     } catch {
-      setMessage("Nie udało się pobrać danych panelu.");
+        show("Nie udało się pobrać danych panelu.", "error");
+    } finally {
+        setLoading(false);
     }
-  };
+    };
 
   useEffect(() => {
     if (authUser && (authUser.role === "DISPATCHER" || authUser.role === "OPERATOR" || authUser.role === "ADMIN")) {
@@ -107,10 +114,10 @@ export default function PanelPage() {
     });
     const data = await res.json();
     if (res.ok) {
-      setMessage(`Status → ${newStatus}`);
+      show(`Status → ${newStatus}`);
       reload();
     } else {
-      setMessage(formatApiError(data.detail, "Błąd statusu."));
+      show(formatApiError(data.detail, "Błąd statusu."), "error");
     }
   };
 
@@ -131,11 +138,11 @@ export default function PanelPage() {
     });
     const data = await res.json();
     if (res.ok) {
-      setMessage(data.message || "Dodano maszynę.");
+      show(data.message || "Dodano maszynę.");
       setNewMachineName("");
       reload();
     } else {
-      setMessage(formatApiError(data.detail, "Błąd dodawania."));
+      show(formatApiError(data.detail, "Błąd dodawania."), "error");
     }
   };
 
@@ -154,10 +161,10 @@ export default function PanelPage() {
     });
     const data = await res.json();
     if (res.ok) {
-      setMessage(data.message || "Dodano blokadę.");
+      show(data.message || "Dodano blokadę.");
       reload();
     } else {
-      setMessage(formatApiError(data.detail, "Błąd blokady."));
+      show(formatApiError(data.detail, "Błąd blokady."), "error");
     }
   };
 
@@ -168,7 +175,7 @@ export default function PanelPage() {
       headers: authHeaders(authUser.token),
     });
     if (res.ok) {
-      setMessage("Usunięto blokadę.");
+      show("Usunięto blokadę.");
       reload();
     }
   };
@@ -177,7 +184,7 @@ export default function PanelPage() {
     if (!authUser) return;
     const val = mthInputs[bookingId];
     if (!val || isNaN(Number(val))) {
-      setMessage("Wpisz poprawny odczyt mth.");
+      show("Wpisz poprawny odczyt mth.", "error");
       return;
     }
     const res = await fetch(`${API_URL}/bookings/${bookingId}/handover`, {
@@ -190,11 +197,11 @@ export default function PanelPage() {
     });
     const data = await res.json();
     if (res.ok) {
-      setMessage(data.message || "Zapisano protokół.");
+      show(data.message || "Zapisano protokół.");
       setMthInputs((p) => ({ ...p, [bookingId]: "" }));
       reload();
     } else {
-      setMessage(formatApiError(data.detail, "Błąd protokołu."));
+      show(formatApiError(data.detail, "Błąd protokołu."), "error");
     }
   };
 
@@ -211,27 +218,31 @@ export default function PanelPage() {
         onCurrency={setCurrency}
         authUser={authUser}
         onLoginClick={() => setShowLogin(true)}
-        onLogout={logout}
+        onLogout={() => {
+          logout();
+          show("Wylogowano.", "info");
+        }}
       />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-5 sm:px-8 py-10 space-y-8">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-brand font-semibold">
-            {t(locale, "navPanel")}
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white">
-            {authUser?.role === "OPERATOR" ? "Panel operatora" : "Panel dyspozytora"}
-          </h1>
-        </div>
+      <main className="flex-1 relative">
+        <div className="absolute inset-0 atmosphere opacity-40 pointer-events-none" />
+        <div className="relative max-w-7xl mx-auto w-full px-5 sm:px-8 py-10 sm:py-12 space-y-8">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500 font-semibold">
+              Digvo
+            </p>
+            <h1 className="mt-1 text-3xl sm:text-4xl font-semibold tracking-tight text-white">
+              {authUser?.role === "OPERATOR" ? "Panel operatora" : "Panel dyspozytora"}
+            </h1>
+            <p className="mt-2 text-sm text-zinc-400">
+              {authUser?.role === "OPERATOR"
+                ? "Odbiory, zwroty i odczyty motogodzin."
+                : "Harmonogram floty, statusy zleceń i blokady UDT."}
+            </p>
+          </div>
 
-        {message && (
-          <p className="text-sm text-zinc-300 bg-white/[0.04] border border-white/[0.08] rounded-2xl px-4 py-3">
-            {message}
-          </p>
-        )}
-
-        {!ready ? null : !authUser ? (
-          <div className="rounded-3xl border border-white/[0.08] bg-panel p-10 text-center">
+            {!ready ? null : !authUser ? (
+          <div className="rounded-2xl border border-white/[0.06] bg-[#111113] p-10 text-center">
             <p className="text-sm text-zinc-400">Zaloguj się jako dyspozytor lub operator.</p>
             <button
               type="button"
@@ -242,70 +253,89 @@ export default function PanelPage() {
             </button>
           </div>
         ) : !isStaff ? (
-          <div className="rounded-3xl border border-white/[0.08] bg-panel p-10 text-center">
+          <div className="rounded-3xl border border-white/[0.06] bg-[#111113] p-10 text-center">
             <p className="text-sm text-zinc-400">To konto nie ma dostępu do panelu floty.</p>
             <Link href="/katalog" className="inline-block mt-5 text-brand text-sm">
               {t(locale, "browse")} →
             </Link>
           </div>
         ) : authUser.role === "OPERATOR" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {bookings
-              .filter((b) => b.status !== "CANCELLED")
-              .map((b) => {
-                const pickup = b.protocols.find((p) => p.protocol_type === "PICKUP");
-                const ret = b.protocols.find((p) => p.protocol_type === "RETURN");
-                const st = statusMeta(b.status);
-                return (
-                  <div key={b.id} className="rounded-3xl border border-white/[0.08] bg-panel p-6 space-y-4">
-                    <div className="flex justify-between gap-3">
-                      <div>
-                        <h2 className="font-semibold text-white">{machineName(b.machine_id)}</h2>
-                        <p className="flex items-center gap-1 text-xs text-zinc-400 mt-1">
-                          <PinIcon className="w-3.5 h-3.5" />
-                          {b.delivery_address || "Baza"} ·{" "}
-                          {new Date(b.start_time).toLocaleDateString("pl-PL")}
-                        </p>
-                      </div>
-                      <span className={`text-[11px] px-2.5 py-1 rounded-full h-fit ${st.cls}`}>{st.label}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-px bg-white/[0.07] rounded-2xl overflow-hidden text-xs">
-                      <div className="bg-black/50 p-4">
-                        <span className="text-zinc-500">PICKUP</span>
-                        <div className="text-emerald-400 font-semibold text-lg mt-1">
-                          {pickup ? `${pickup.engine_hours_reading} mth` : "—"}
+            loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {[1, 2].map((n) => (
+                    <div key={n} className="h-48 rounded-3xl skeleton" />
+                ))}
+                </div>
+            ) : bookings.filter((b) => b.status !== "CANCELLED").length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-white/[0.12] bg-[#111113] p-10 text-center">
+                <p className="text-lg font-semibold text-white">Brak aktywnych zleceń</p>
+                <p className="mt-2 text-sm text-zinc-400">
+                    Gdy dyspozytor przypisze Ci rezerwację, pojawi się tu do odbioru / zwrotu.
+                </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {bookings
+                    .filter((b) => b.status !== "CANCELLED")
+                    .map((b) => {
+                    const pickup = b.protocols.find((p) => p.protocol_type === "PICKUP");
+                    const ret = b.protocols.find((p) => p.protocol_type === "RETURN");
+                    const st = statusMeta(b.status);
+                    return (
+                        <div key={b.id} className="rounded-3xl border border-white/[0.06] bg-[#111113] p-6 space-y-4">
+                        <div className="flex justify-between gap-3">
+                            <div>
+                            <h2 className="font-semibold text-white">{machineName(b.machine_id)}</h2>
+                            <p className="flex items-center gap-1 text-xs text-zinc-400 mt-1">
+                                <PinIcon className="w-3.5 h-3.5" />
+                                {b.delivery_address || "Baza"} ·{" "}
+                                {new Date(b.start_time).toLocaleDateString("pl-PL")}
+                            </p>
+                            </div>
+                            <span className={`text-[11px] px-2.5 py-1 rounded-full h-fit ${st.cls}`}>
+                            {st.label}
+                            </span>
                         </div>
-                      </div>
-                      <div className="bg-black/50 p-4">
-                        <span className="text-zinc-500">RETURN</span>
-                        <div className="text-sky-400 font-semibold text-lg mt-1">
-                          {ret ? `${ret.engine_hours_reading} mth` : "—"}
+                        <div className="grid grid-cols-2 gap-px bg-white/[0.07] rounded-2xl overflow-hidden text-xs">
+                            <div className="bg-black/50 p-4">
+                            <span className="text-zinc-500">PICKUP</span>
+                            <div className="text-emerald-400 font-semibold text-lg mt-1">
+                                {pickup ? `${pickup.engine_hours_reading} mth` : "—"}
+                            </div>
+                            </div>
+                            <div className="bg-black/50 p-4">
+                            <span className="text-zinc-500">RETURN</span>
+                            <div className="text-sky-400 font-semibold text-lg mt-1">
+                                {ret ? `${ret.engine_hours_reading} mth` : "—"}
+                            </div>
+                            </div>
                         </div>
-                      </div>
-                    </div>
-                    {(!pickup || !ret) && (
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          step="0.1"
-                          placeholder="mth"
-                          value={mthInputs[b.id] || ""}
-                          onChange={(e) => setMthInputs((p) => ({ ...p, [b.id]: e.target.value }))}
-                          className={`${INPUT_CLS} flex-1 rounded-full px-5`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleHandover(b.id, pickup ? "RETURN" : "PICKUP")}
-                          className="bg-brand text-black font-semibold px-4 py-2 rounded-full text-xs"
-                        >
-                          {pickup ? "RETURN" : "PICKUP"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
+                        {(!pickup || !ret) && (
+                            <div className="flex gap-2">
+                            <input
+                                type="number"
+                                step="0.1"
+                                placeholder="mth"
+                                value={mthInputs[b.id] || ""}
+                                onChange={(e) =>
+                                setMthInputs((p) => ({ ...p, [b.id]: e.target.value }))
+                                }
+                                className={`${INPUT_CLS} flex-1 rounded-full px-5`}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => handleHandover(b.id, pickup ? "RETURN" : "PICKUP")}
+                                className="bg-brand text-black font-semibold px-4 py-2 rounded-full text-xs"
+                            >
+                                {pickup ? "RETURN" : "PICKUP"}
+                            </button>
+                            </div>
+                        )}
+                        </div>
+                    );
+                    })}
+                </div>
+            )
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -314,14 +344,20 @@ export default function PanelPage() {
                 { label: "Aktywne zlecenia", value: String(activeBookingsCount) },
                 { label: "Blokady UDT", value: String(blocks.length) },
               ].map((s) => (
-                <div key={s.label} className="rounded-3xl border border-white/[0.08] bg-panel p-5">
-                  <p className="text-xs text-zinc-500">{s.label}</p>
-                  <p className="mt-2 text-2xl font-semibold text-white tabular-nums">{s.value}</p>
+                <div
+                  key={s.label}
+                  className="rounded-2xl border border-white/[0.06] bg-[#111113] p-5 relative overflow-hidden"
+                >
+                  <div className="absolute top-0 inset-x-0 h-1 hazard opacity-80" />
+                  <p className="text-xs text-zinc-500 mt-1">{s.label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-white tabular-nums tracking-tight">
+                    {s.value}
+                  </p>
                 </div>
               ))}
             </div>
 
-            <div className="rounded-3xl border border-white/[0.08] bg-panel p-6">
+            <div className="rounded-3xl border border-white/[0.06] bg-[#111113] p-6">
               <div className="flex flex-wrap justify-between gap-3 mb-4">
                 <h2 className="text-lg font-semibold text-white">Harmonogram</h2>
                 <div className="flex gap-1.5 flex-wrap">
@@ -330,8 +366,10 @@ export default function PanelPage() {
                       key={k}
                       type="button"
                       onClick={() => setStatusFilter(k)}
-                      className={`text-xs px-3 py-1.5 rounded-full ${
-                        statusFilter === k ? "bg-white text-black" : "bg-black/40 text-zinc-400"
+                      className={`text-xs px-3 py-1.5 rounded-full border transition ${
+                        statusFilter === k
+                          ? "bg-white text-black border-white"
+                          : "bg-transparent text-zinc-400 border-white/10 hover:border-white/25 hover:text-white"
                       }`}
                     >
                       {k === "ALL" ? "Wszystkie" : k}
@@ -416,7 +454,7 @@ export default function PanelPage() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <form
                 onSubmit={handleCreateMachine}
-                className="rounded-3xl border border-white/[0.08] bg-panel p-6 space-y-3"
+                className="rounded-3xl border border-white/[0.06] bg-[#111113] p-6 space-y-3"
               >
                 <h3 className="font-semibold text-white">Dodaj maszynę</h3>
                 <input
@@ -455,7 +493,7 @@ export default function PanelPage() {
 
               <form
                 onSubmit={handleCreateBlock}
-                className="rounded-3xl border border-white/[0.08] bg-panel p-6 space-y-3"
+                className="rounded-3xl border border-white/[0.06] bg-[#111113] p-6 space-y-3"
               >
                 <h3 className="font-semibold text-white">Blokada UDT / serwis</h3>
                 <select
@@ -506,8 +544,9 @@ export default function PanelPage() {
               </form>
             </div>
           </>
-        )}
-      </main>
+          )}
+          </div>
+        </main>
 
         <footer className="border-t border-white/[0.06] mt-auto">
             <div className="hazard h-1 opacity-70" />
@@ -540,6 +579,7 @@ export default function PanelPage() {
                 </div>
             </div>
         </footer>
+        <Toast flash={flash} onClose={clear} />
       <LoginModal
         open={showLogin}
         onClose={closeLogin}

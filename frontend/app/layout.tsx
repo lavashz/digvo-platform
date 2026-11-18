@@ -15,9 +15,31 @@ const body = Source_Sans_3({
 });
 
 export const metadata: Metadata = {
-  title: "Digvo — wynajem maszyn budowlanych z operatorem i transportem",
+  metadataBase: new URL("https://digvo-platform.vercel.app"),
+  title: {
+    default: "Digvo — wynajem maszyn z operatorem i transportem",
+    template: "%s · Digvo",
+  },
   description:
-    "Marketplace sprzętu budowlanego: maszyna, operator z uprawnieniami UDT i transport w jednej rezerwacji. Umowa PDF w 30 sekund.",
+    "Marketplace sprzętu budowlanego: maszyna, operator UDT i transport w jednej rezerwacji. Umowa PDF w 30 sekund.",
+  applicationName: "Digvo",
+  keywords: ["wynajem maszyn", "koparka", "UDT", "Bydgoszcz", "Digvo"],
+  openGraph: {
+    type: "website",
+    locale: "pl_PL",
+    siteName: "Digvo",
+    title: "Digvo — maszyna, operator, transport",
+    description:
+      "Lokalni dostawcy, rezerwacja online, umowa PDF. Marketplace floty budowlanej.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Digvo — wynajem maszyn budowlanych",
+    description: "Maszyna + operator UDT + transport w jednej rezerwacji.",
+  },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export const viewport: Viewport = {

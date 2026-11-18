@@ -8,6 +8,8 @@ import { ArrowRightIcon, HardHatIcon, TruckIcon, FileIcon } from "./components/I
 import { useAuth } from "./lib/auth";
 import { DEMO_ACCOUNTS } from "./lib/vendors";
 import { t, type Locale, type Currency } from "./lib/i18n";
+import Toast from "./components/Toast";
+import { useFlash } from "./lib/flash";
 
 /** Te same URL-e co w machineImages.ts — u Ciebie już działają w katalogu */
 const IMG = {
@@ -48,7 +50,7 @@ export default function HomePage() {
 
   const [locale, setLocale] = useState<Locale>("pl");
   const [currency, setCurrency] = useState<Currency>("PLN");
-  const [message, setMessage] = useState<string | null>(null);
+  const { flash, show, clear } = useFlash();
 
   useEffect(() => {
     const savedLocale = localStorage.getItem("digvo_locale");
@@ -73,15 +75,10 @@ export default function HomePage() {
         onLoginClick={() => setShowLogin(true)}
         onLogout={() => {
           logout();
-          setMessage(null);
+          show(t(locale, "loggedOut"), "info")
         }}
       />
 
-      {message && (
-        <div className="bg-emerald-500/10 border-b border-emerald-500/20 text-emerald-200 text-sm text-center py-2">
-          {message}
-        </div>
-      )}
 
       <main className="flex-1">
         {/* HERO */}
@@ -123,7 +120,7 @@ export default function HomePage() {
                 href="#kategorie"
                 className="inline-flex items-center px-5 py-3.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-sm text-white transition"
               >
-                Zobacz kategorie
+                {t(locale, "seeCategories")}
               </a>
             </div>
           </div>
@@ -133,10 +130,10 @@ export default function HomePage() {
         <section className="border-b border-white/[0.06] bg-[#0c0c0e]">
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             {[
-              ["3", "wypożyczalnie"],
-              ["UDT", "operatorzy"],
-              ["PDF", "umowa od razu"],
-              ["24h", "rezerwacja"],
+              ["3", t(locale, "trustVendors")],
+              ["UDT", t(locale, "trustOperators")],
+              ["PDF", t(locale, "trustContract")],
+              ["24h", t(locale, "trustBooking")],
             ].map(([k, v]) => (
               <div key={v} className="flex items-baseline gap-2">
                 <span className="text-brand font-semibold text-lg tabular-nums">{k}</span>
@@ -151,14 +148,14 @@ export default function HomePage() {
           <div className="flex items-end justify-between gap-4 mb-8">
             <div>
               <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
-                Sprzęt gotowy do pracy
+                {t(locale, "equipmentReady")}
               </h2>
               <p className="mt-2 text-sm text-zinc-400">
-                Wybierz typ maszyny i przejdź do katalogu.
+                {t(locale, "equipmentReadySub")}
               </p>
             </div>
             <Link href="/katalog" className="hidden sm:inline text-sm text-brand hover:text-brand-soft font-medium">
-              Cały katalog →
+              {t(locale, "fullCatalog")}
             </Link>
           </div>
 
@@ -220,13 +217,13 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
             <div className="flex items-center gap-3 mb-3">
               <span className="h-px w-8 bg-brand" />
-              <p className="text-[11px] uppercase tracking-[0.2em] text-brand font-semibold">Proces</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-brand font-semibold">{t(locale, "processLabel")}</p>
             </div>
             <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
               {t(locale, "howItWorks")}
             </h2>
             <p className="mt-3 max-w-xl text-sm text-zinc-400 leading-relaxed">
-              Jak marketplace: wybór → termin i opcje → potwierdzenie z PDF.
+              {t(locale, "processSub")}
             </p>
 
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -256,10 +253,10 @@ export default function HomePage() {
           <div className="relative max-w-7xl mx-auto px-5 sm:px-8 py-20 sm:py-24 text-center">
             <p className="text-brand text-xs font-semibold tracking-[0.22em] uppercase mb-4">Digvo</p>
             <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
-              Maszyna na jutro, nie za tydzień.
+              {t(locale, "ctaTomorrow")}
             </h2>
             <p className="mt-4 text-zinc-300 max-w-md mx-auto text-sm sm:text-base">
-              Katalog lokalnych wypożyczalni — z operatorem UDT i transportem.
+              {t(locale, "ctaTomorrowSub")}
             </p>
             <Link
               href="/katalog"
@@ -301,6 +298,8 @@ export default function HomePage() {
   </div>
 </footer>
 
+<Toast flash={flash} onClose={clear} />
+
       <LoginModal
         open={showLogin}
         onClose={closeLogin}
@@ -309,17 +308,17 @@ export default function HomePage() {
         onClearError={clearLoginError}
         onLogin={async (e, p) => {
           const ok = await performLogin(e, p);
-          if (ok) setMessage("Zalogowano.");
+          if (ok) show(t(locale, "loggedIn"), "success")
           return ok;
         }}
         onRegister={async (payload) => {
           const ok = await performRegister(payload);
-          if (ok) setMessage("Konto utworzone.");
+          if (ok) show(t(locale, "accountCreated"), "success");
           return ok;
         }}
         onQuickLogin={async (email) => {
           const ok = await quickLogin(email);
-          if (ok) setMessage("Zalogowano.");
+          if (ok) show(t(locale, "loggedIn"), "success")
           return ok;
         }}
       />
