@@ -38,7 +38,17 @@ export const metadata: Metadata = {
     description: "Maszyna + operator UDT + transport w jednej rezerwacji.",
   },
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/pwa-192.svg", type: "image/svg+xml", sizes: "192x192" },
+    ],
+    apple: [{ url: "/pwa-192.svg" }],
+  },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Digvo",
   },
 };
 

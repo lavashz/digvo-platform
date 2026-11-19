@@ -17,8 +17,10 @@ from app.models import (
 )
 from app.schemas import (
     BookingCreate, BookingResponse, BookingQuoteResponse, BookingStatusUpdate,
+    BookingScheduleUpdate,
     HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse, RegisterRequest,
     WARSAW,
+)
 )
 from app.auth import verify_password, create_access_token, get_current_user, hash_password
 
@@ -142,7 +144,11 @@ def score_operator(
 
 
 def find_available_operator(
-    db: Session, machine: Machine, start_time: datetime, end_time: datetime
+    db: Session,
+    machine: Machine,
+    start_time: datetime,
+    end_time: datetime,
+    exclude_booking_id: UUID | None = None,
 ) -> OperatorProfile | None:
     qualified_ops = db.execute(
         select(OperatorProfile)
@@ -159,14 +165,15 @@ def find_available_operator(
     best_score = -1.0
 
     for op in qualified_ops:
-        op_busy = db.execute(
-            select(Booking).where(
-                Booking.operator_id == op.user_id,
-                Booking.status != BookingStatus.CANCELLED,
-                Booking.start_time < end_time,
-                Booking.end_time > start_time,
-            ).limit(1)
-        ).scalars().first()
+        busy_q = select(Booking).where(
+            Booking.operator_id == op.user_id,
+            Booking.status != BookingStatus.CANCELLED,
+            Booking.start_time < end_time,
+            Booking.end_time > start_time,
+        )
+        if exclude_booking_id is not None:
+            busy_q = busy_q.where(Booking.id != exclude_booking_id)
+        op_busy = db.execute(busy_q.limit(1)).scalars().first()
 
         op_blocked = db.execute(
             select(UnavailabilityBlock).where(
@@ -193,6 +200,7 @@ def find_available_transport(
     start_time: datetime,
     end_time: datetime,
     transport_buffer: timedelta | None = None,
+    exclude_booking_id: UUID | None = None,
 ) -> TransportVehicle | None:
     buffer = transport_buffer or timedelta(0)
     window_start = start_time - buffer
@@ -206,14 +214,15 @@ def find_available_transport(
     ).scalars().all()
 
     for vehicle in vehicles:
-        busy = db.execute(
-            select(Booking).where(
-                Booking.transport_vehicle_id == vehicle.id,
-                Booking.status != BookingStatus.CANCELLED,
-                Booking.start_time < window_end,
-                Booking.end_time > window_start,
-            ).limit(1)
-        ).scalars().first()
+        busy_q = select(Booking).where(
+            Booking.transport_vehicle_id == vehicle.id,
+            Booking.status != BookingStatus.CANCELLED,
+            Booking.start_time < window_end,
+            Booking.end_time > window_start,
+        )
+        if exclude_booking_id is not None:
+            busy_q = busy_q.where(Booking.id != exclude_booking_id)
+        busy = db.execute(busy_q.limit(1)).scalars().first()
         if not busy:
             return vehicle
     return None
@@ -702,6 +711,155 @@ def update_booking_status(
     db.refresh(booking)
     return {"id": str(booking.id), "status": booking.status.value}
 
+@app.patch("/bookings/{booking_id}/schedule")
+def update_booking_schedule(
+    booking_id: UUID,
+    payload: BookingScheduleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in (UserRole.DISPATCHER, UserRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Tylko dyspozytor może zmieniać harmonogram zlecenia.")
+
+    if payload.end_time <= payload.start_time:
+        raise HTTPException(status_code=400, detail="Data zakończenia musi być późniejsza niż rozpoczęcia.")
+
+    booking = db.get(Booking, booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Nie znaleziono rezerwacji.")
+
+    if booking.status == BookingStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Nie można przesuwać anulowanej rezerwacji.")
+    if booking.status == BookingStatus.COMPLETED:
+        raise HTTPException(status_code=409, detail="Nie można przesuwać zakończonej rezerwacji.")
+
+    target_machine_id = payload.machine_id or booking.machine_id
+    machine = db.execute(
+        select(Machine)
+        .options(joinedload(Machine.organization))
+        .where(Machine.id == target_machine_id)
+    ).scalars().first()
+    if not machine:
+        raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
+
+    if machine.udt_valid_until and machine.udt_valid_until < payload.end_time.date():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Maszyna ma nieważny przegląd UDT (ważny do {machine.udt_valid_until.isoformat()}).",
+        )
+
+    buffer = timedelta(hours=machine.service_buffer_hours)
+    machine_block = db.execute(
+        select(UnavailabilityBlock).where(
+            UnavailabilityBlock.machine_id == machine.id,
+            UnavailabilityBlock.start_time < payload.end_time + buffer,
+            UnavailabilityBlock.end_time > payload.start_time,
+        ).limit(1)
+    ).scalars().first()
+    if machine_block:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Maszyna jest zablokowana serwisowo ({machine_block.reason.value}) w tym terminie.",
+        )
+
+    buffered_conflict = db.execute(
+        select(Booking).where(
+            Booking.machine_id == machine.id,
+            Booking.id != booking.id,
+            Booking.status != BookingStatus.CANCELLED,
+            Booking.start_time < payload.end_time + buffer,
+            Booking.end_time > payload.start_time - buffer,
+        ).limit(1)
+    ).scalars().first()
+    if buffered_conflict:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Maszyna niedostępna — wymagany bufor serwisowy {machine.service_buffer_hours} h.",
+        )
+
+    org = machine.organization
+    distance_km = None
+    if booking.with_transport and booking.delivery_lat is not None and booking.delivery_lng is not None:
+        if org and org.base_lat is not None and org.base_lng is not None:
+            distance_km = calculate_distance_km(
+                float(org.base_lat),
+                float(org.base_lng),
+                float(booking.delivery_lat),
+                float(booking.delivery_lng),
+            )
+
+    transport_buffer_hours = (
+        estimate_transport_buffer_hours(distance_km) if booking.with_transport else None
+    )
+    transport_buffer = (
+        timedelta(hours=transport_buffer_hours) if transport_buffer_hours is not None else None
+    )
+
+    assigned_op = None
+    if booking.with_operator:
+        assigned_op = find_available_operator(
+            db, machine, payload.start_time, payload.end_time, exclude_booking_id=booking.id
+        )
+        if not assigned_op:
+            raise HTTPException(
+                status_code=409,
+                detail="Brak wolnego operatora z wymaganymi uprawnieniami UDT w tym terminie.",
+            )
+
+    assigned_vehicle = None
+    if booking.with_transport:
+        assigned_vehicle = find_available_transport(
+            db,
+            machine,
+            payload.start_time,
+            payload.end_time,
+            transport_buffer,
+            exclude_booking_id=booking.id,
+        )
+        if not assigned_vehicle:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Brak wolnego pojazdu transportowego u tego dostawcy w wybranym terminie "
+                    f"(wraz z buforem logistycznym {transport_buffer_hours} h)."
+                ),
+            )
+
+    total_hours = Decimal(str((payload.end_time - payload.start_time).total_seconds() / 3600))
+    rental_days = max(Decimal("1"), Decimal(str(math.ceil(float(total_hours) / 24))))
+    machine_cost = rental_days * machine.daily_rate_net
+    operator_cost = (total_hours * assigned_op.hourly_rate_net) if assigned_op else Decimal("0.00")
+    transport_cost = Decimal("0.00")
+    if distance_km is not None:
+        transport_cost = Decimal(str(distance_km * 2)) * machine.transport_rate_per_km
+    total_price = (machine_cost + operator_cost + transport_cost).quantize(Decimal("0.01"))
+
+    booking.machine_id = machine.id
+    booking.start_time = payload.start_time
+    booking.end_time = payload.end_time
+    booking.operator_id = assigned_op.user_id if assigned_op else None
+    booking.transport_vehicle_id = assigned_vehicle.id if assigned_vehicle else None
+    booking.total_price_net = total_price
+
+    try:
+        db.commit()
+        db.refresh(booking)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Konflikt terminów! Maszyna, operator lub transport są niedostępni w tym oknie.",
+        )
+
+    return {
+        "id": str(booking.id),
+        "machine_id": str(booking.machine_id),
+        "operator_id": str(booking.operator_id) if booking.operator_id else None,
+        "start_time": booking.start_time,
+        "end_time": booking.end_time,
+        "total_price_net": float(booking.total_price_net),
+        "status": booking.status.value,
+    }
 
 @app.post("/bookings/{booking_id}/handover", status_code=201)
 def create_handover_protocol(

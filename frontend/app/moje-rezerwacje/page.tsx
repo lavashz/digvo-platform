@@ -218,8 +218,12 @@ export default function MyBookingsPage() {
             <div className="flex flex-wrap gap-x-5 gap-y-1">
               <span>Platforma demo — praca inżynierska</span>
               <span>Zdjęcia: Wikimedia Commons (CC)</span>
-              <span>Regulamin</span>
-              <span>Polityka prywatności</span>
+              <Link href="/regulamin" className="hover:text-zinc-400 transition">
+                Regulamin
+              </Link>
+              <Link href="/polityka-prywatnosci" className="hover:text-zinc-400 transition">
+                Polityka prywatności
+              </Link>
             </div>
           </div>
         </div>

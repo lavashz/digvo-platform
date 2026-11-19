@@ -1,18 +1,24 @@
 import type { Machine } from "./types";
 
-/**
- * Zdjęcia realnego sprzętu (Wikimedia Commons).
- * Mapowanie po nazwie maszyny → potem po kategorii.
- */
-const IMG = {
+const LOCAL = {
+  catExcavator: "/machines/cat-excavator.jpg",
+  catBackhoe: "/machines/cat-backhoe.jpg",
+  jcbBackhoe: "/machines/jcb-backhoe.jpg",
+  volvoLoader: "/machines/volvo-loader.jpg",
+  liebherrWheeled: "/machines/liebherr.jpg",
+  bobcatMini: "/machines/bobcat-mini.jpg",
+  compactExcavator: "/machines/kubota-mini.jpg",
+  telehandler: "/machines/telehandler.jpg",
+  roller: "/machines/roller.jpg",
+} as const;
+
+const REMOTE = {
   catExcavator:
     "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Caterpillar_330_excavator_on_a_pile_of_dirt.jpg/1280px-Caterpillar_330_excavator_on_a_pile_of_dirt.jpg",
   catBackhoe:
     "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Caterpillar_backhoe_loader_at_construction_site_in_Sunnyvale%2C_back_view.jpg/1280px-Caterpillar_backhoe_loader_at_construction_site_in_Sunnyvale%2C_back_view.jpg",
   jcbBackhoe:
     "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Koparko-ladowarka.jpg/1280px-Koparko-ladowarka.jpg",
-  terexBackhoe:
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Terex_TLB_825_in_Saint_Petersburg.jpg/1280px-Terex_TLB_825_in_Saint_Petersburg.jpg",
   volvoLoader:
     "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Volvo_L90G_loader_at_a_job_site_in_a_Palo_Alto.jpg/1280px-Volvo_L90G_loader_at_a_job_site_in_a_Palo_Alto.jpg",
   liebherrWheeled:
@@ -27,7 +33,36 @@ const IMG = {
     "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Caterpillar_CB54B_roller_on_dirt_lot_in_Campbell.jpg/1280px-Caterpillar_CB54B_roller_on_dirt_lot_in_Campbell.jpg",
 } as const;
 
-/** Exact match na nazwy ze seeda */
+/** Prefer local file; browser will 404→broken if missing — use known-local set */
+const KNOWN_LOCAL = new Set([
+  "cat-excavator.jpg",
+  "cat-backhoe.jpg",
+  "volvo-loader.jpg",
+  "telehandler.jpg",
+  "jcb-backhoe.jpg",
+  "liebherr.jpg",
+  "bobcat-mini.jpg",
+  "kubota-mini.jpg",
+  "roller.jpg",
+]);
+
+function pick(key: keyof typeof LOCAL): string {
+  const file = LOCAL[key].replace("/machines/", "");
+  return KNOWN_LOCAL.has(file) ? LOCAL[key] : REMOTE[key];
+}
+
+const IMG = {
+  catExcavator: pick("catExcavator"),
+  catBackhoe: pick("catBackhoe"),
+  jcbBackhoe: pick("jcbBackhoe"),
+  volvoLoader: pick("volvoLoader"),
+  liebherrWheeled: pick("liebherrWheeled"),
+  bobcatMini: pick("bobcatMini"),
+  compactExcavator: pick("compactExcavator"),
+  telehandler: pick("telehandler"),
+  roller: pick("roller"),
+};
+
 const BY_NAME: Record<string, string> = {
   "Koparka gąsienicowa CAT 320 (20t)": IMG.catExcavator,
   "Koparkoładowarka JCB 3CX": IMG.jcbBackhoe,
@@ -68,3 +103,5 @@ export function machineImageUrl(machine: Pick<Machine, "name" | "category">): st
 
   return BY_CATEGORY[machine.category] || IMG.catExcavator;
 }
+
+export { LOCAL, REMOTE };

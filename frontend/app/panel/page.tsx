@@ -12,6 +12,7 @@ import type { Booking, Machine, UnavailabilityBlock } from "../lib/types";
 import { t, type Locale, type Currency } from "../lib/i18n";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
+import FleetGantt from "../components/FleetGantt";
 
 export default function PanelPage() {
   const {
@@ -34,6 +35,11 @@ export default function PanelPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [blocks, setBlocks] = useState<UnavailabilityBlock[]>([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [timeFilter, setTimeFilter] = useState<"ALL" | "TODAY" | "WEEK" | "DAY">("WEEK");
+  const [dayFilterIso, setDayFilterIso] = useState<string | null>(null);
+  const [ganttMode, setGanttMode] = useState<"week" | "day">("week");
+  const [ganttAnchor, setGanttAnchor] = useState(() => new Date());
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [mthInputs, setMthInputs] = useState<Record<string, string>>({});
 
   const [blockMachineId, setBlockMachineId] = useState("");
@@ -93,9 +99,46 @@ export default function PanelPage() {
 
   const machineName = (id: string) => machines.find((m) => m.id === id)?.name || "Maszyna";
 
-  const filteredBookings = useMemo(
-    () => (statusFilter === "ALL" ? bookings : bookings.filter((b) => b.status === statusFilter)),
-    [bookings, statusFilter]
+  const filteredBookings = useMemo(() => {
+    const startOfDay = (d: Date) => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    };
+    const today0 = startOfDay(new Date());
+    const weekEnd = new Date(today0);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    let list = bookings.filter((b) => {
+      if (statusFilter !== "ALL" && b.status !== statusFilter) return false;
+      const s = new Date(b.start_time);
+      const e = new Date(b.end_time);
+      if (timeFilter === "TODAY") {
+        const t1 = new Date(today0);
+        t1.setDate(t1.getDate() + 1);
+        return s < t1 && e > today0;
+      }
+      if (timeFilter === "WEEK") {
+        return s < weekEnd && e > today0;
+      }
+      if (timeFilter === "DAY" && dayFilterIso) {
+        const d0 = new Date(`${dayFilterIso}T00:00:00`);
+        const d1 = new Date(d0);
+        d1.setDate(d1.getDate() + 1);
+        return s < d1 && e > d0;
+      }
+      return true;
+    });
+
+    list = [...list].sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    );
+    return list;
+  }, [bookings, statusFilter, timeFilter, dayFilterIso]);
+
+  const selectedBooking = useMemo(
+    () => bookings.find((b) => b.id === selectedBookingId) || null,
+    [bookings, selectedBookingId]
   );
 
   const totalRevenueNet = bookings
@@ -119,6 +162,32 @@ export default function PanelPage() {
     } else {
       show(formatApiError(data.detail, "Błąd statusu."), "error");
     }
+  };
+
+  const handleSchedule = async (args: {
+    bookingId: string;
+    start_time: string;
+    end_time: string;
+    machine_id: string;
+  }) => {
+    if (!authUser) return false;
+    const res = await fetch(`${API_URL}/bookings/${args.bookingId}/schedule`, {
+      method: "PATCH",
+      headers: authHeaders(authUser.token),
+      body: JSON.stringify({
+        start_time: args.start_time,
+        end_time: args.end_time,
+        machine_id: args.machine_id,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      show("Harmonogram zaktualizowany.");
+      await reload();
+      return true;
+    }
+    show(formatApiError(data.detail, "Konflikt / błąd przesunięcia."), "error");
+    return false;
   };
 
   const handleCreateMachine = async (e: FormEvent) => {
@@ -274,60 +343,89 @@ export default function PanelPage() {
                 </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 gap-4 max-w-lg mx-auto w-full pb-24">
                 {bookings
                     .filter((b) => b.status !== "CANCELLED")
                     .map((b) => {
                     const pickup = b.protocols.find((p) => p.protocol_type === "PICKUP");
                     const ret = b.protocols.find((p) => p.protocol_type === "RETURN");
                     const st = statusMeta(b.status);
+                    const nextAction = !pickup ? "PICKUP" : !ret ? "RETURN" : null;
                     return (
-                        <div key={b.id} className="rounded-3xl border border-white/[0.06] bg-[#111113] p-6 space-y-4">
+                        <div
+                          key={b.id}
+                          className="rounded-3xl border border-white/[0.08] bg-[#111113] p-5 sm:p-6 space-y-5"
+                        >
                         <div className="flex justify-between gap-3">
-                            <div>
-                            <h2 className="font-semibold text-white">{machineName(b.machine_id)}</h2>
-                            <p className="flex items-center gap-1 text-xs text-zinc-400 mt-1">
-                                <PinIcon className="w-3.5 h-3.5" />
-                                {b.delivery_address || "Baza"} ·{" "}
-                                {new Date(b.start_time).toLocaleDateString("pl-PL")}
+                            <div className="min-w-0">
+                            <h2 className="text-xl font-semibold text-white leading-tight">
+                              {machineName(b.machine_id)}
+                            </h2>
+                            <p className="flex items-start gap-1.5 text-sm text-zinc-400 mt-2">
+                                <PinIcon className="w-4 h-4 mt-0.5 shrink-0" />
+                                <span>
+                                  {b.delivery_address || "Baza"}
+                                  <br />
+                                  {new Date(b.start_time).toLocaleString("pl-PL", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                  {" → "}
+                                  {new Date(b.end_time).toLocaleString("pl-PL", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
                             </p>
                             </div>
-                            <span className={`text-[11px] px-2.5 py-1 rounded-full h-fit ${st.cls}`}>
+                            <span className={`text-xs px-3 py-1.5 rounded-full h-fit shrink-0 ${st.cls}`}>
                             {st.label}
                             </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-px bg-white/[0.07] rounded-2xl overflow-hidden text-xs">
-                            <div className="bg-black/50 p-4">
-                            <span className="text-zinc-500">PICKUP</span>
-                            <div className="text-emerald-400 font-semibold text-lg mt-1">
-                                {pickup ? `${pickup.engine_hours_reading} mth` : "—"}
+
+                        <div className="grid grid-cols-2 gap-px bg-white/[0.07] rounded-2xl overflow-hidden">
+                            <div className="bg-black/50 p-5">
+                            <span className="text-xs text-zinc-500 uppercase tracking-wide">PICKUP</span>
+                            <div className="text-emerald-400 font-semibold text-2xl mt-2 tabular-nums">
+                                {pickup ? `${pickup.engine_hours_reading}` : "—"}
                             </div>
+                            <div className="text-xs text-zinc-500 mt-0.5">mth</div>
                             </div>
-                            <div className="bg-black/50 p-4">
-                            <span className="text-zinc-500">RETURN</span>
-                            <div className="text-sky-400 font-semibold text-lg mt-1">
-                                {ret ? `${ret.engine_hours_reading} mth` : "—"}
+                            <div className="bg-black/50 p-5">
+                            <span className="text-xs text-zinc-500 uppercase tracking-wide">RETURN</span>
+                            <div className="text-sky-400 font-semibold text-2xl mt-2 tabular-nums">
+                                {ret ? `${ret.engine_hours_reading}` : "—"}
                             </div>
+                            <div className="text-xs text-zinc-500 mt-0.5">mth</div>
                             </div>
                         </div>
-                        {(!pickup || !ret) && (
-                            <div className="flex gap-2">
+
+                        {nextAction && (
+                            <div className="space-y-3 sticky bottom-4 z-10">
+                            <label className="block text-xs text-zinc-500 uppercase tracking-wide">
+                              Odczyt motogodzin
+                            </label>
                             <input
                                 type="number"
+                                inputMode="decimal"
                                 step="0.1"
-                                placeholder="mth"
+                                placeholder="np. 1450.5"
                                 value={mthInputs[b.id] || ""}
                                 onChange={(e) =>
                                 setMthInputs((p) => ({ ...p, [b.id]: e.target.value }))
                                 }
-                                className={`${INPUT_CLS} flex-1 rounded-full px-5`}
+                                className={`${INPUT_CLS} w-full rounded-2xl px-5 py-4 text-lg tabular-nums`}
                             />
                             <button
                                 type="button"
-                                onClick={() => handleHandover(b.id, pickup ? "RETURN" : "PICKUP")}
-                                className="bg-brand text-black font-semibold px-4 py-2 rounded-full text-xs"
+                                onClick={() => handleHandover(b.id, nextAction)}
+                                className="w-full min-h-[52px] bg-brand text-black font-bold text-base rounded-2xl active:scale-[0.99] transition"
                             >
-                                {pickup ? "RETURN" : "PICKUP"}
+                                Zapisz {nextAction}
                             </button>
                             </div>
                         )}
@@ -335,7 +433,6 @@ export default function PanelPage() {
                     );
                     })}
                 </div>
-            )
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -357,10 +454,121 @@ export default function PanelPage() {
               ))}
             </div>
 
+            <FleetGantt
+              machines={machines}
+              bookings={bookings}
+              blocks={blocks}
+              viewMode={ganttMode}
+              anchor={ganttAnchor}
+              onAnchorChange={setGanttAnchor}
+              onViewModeChange={setGanttMode}
+              selectedBookingId={selectedBookingId}
+              onSelectBooking={setSelectedBookingId}
+              onSchedule={handleSchedule}
+              onDayFilter={(iso) => {
+                setDayFilterIso(iso);
+                setTimeFilter("DAY");
+              }}
+            />
+
+            {selectedBooking && (
+              <div className="rounded-3xl border border-white/[0.08] bg-[#111113] p-5 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-500">Wybrane zlecenie</p>
+                  <p className="mt-1 text-white font-semibold">
+                    {machineName(selectedBooking.machine_id)}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    {new Date(selectedBooking.start_time).toLocaleString("pl-PL")} →{" "}
+                    {new Date(selectedBooking.end_time).toLocaleString("pl-PL")}
+                    {selectedBooking.delivery_address
+                      ? ` · ${selectedBooking.delivery_address}`
+                      : ""}
+                  </p>
+                  <p className="mt-1 text-sm tabular-nums text-zinc-300">
+                    {selectedBooking.total_price_net} zł · {selectedBooking.status}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <a
+                    href={`${API_URL}/bookings/${selectedBooking.id}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs bg-white/[0.08] px-3 py-1.5 rounded-full"
+                  >
+                    PDF
+                  </a>
+                  {selectedBooking.status === "CONFIRMED" && (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(selectedBooking.id, "IN_PROGRESS")}
+                      className="text-xs text-brand px-3 py-1.5 rounded-full border border-brand/40"
+                    >
+                      Start
+                    </button>
+                  )}
+                  {(selectedBooking.status === "CONFIRMED" ||
+                    selectedBooking.status === "IN_PROGRESS") && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(selectedBooking.id, "COMPLETED")}
+                        className="text-xs text-sky-300 px-3 py-1.5"
+                      >
+                        Zakończ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(selectedBooking.id, "CANCELLED")}
+                        className="text-xs text-rose-300 px-3 py-1.5"
+                      >
+                        Anuluj
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBookingId(null)}
+                    className="text-xs text-zinc-500 px-3 py-1.5"
+                  >
+                    Zamknij
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-3xl border border-white/[0.06] bg-[#111113] p-6">
               <div className="flex flex-wrap justify-between gap-3 mb-4">
                 <h2 className="text-lg font-semibold text-white">Harmonogram</h2>
                 <div className="flex gap-1.5 flex-wrap">
+                  {(
+                    [
+                      ["TODAY", "Dziś"],
+                      ["WEEK", "Ten tydzień"],
+                      ["ALL", "Wszystkie"],
+                    ] as const
+                  ).map(([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => {
+                        setTimeFilter(k);
+                        setDayFilterIso(null);
+                      }}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition ${
+                        timeFilter === k
+                          ? "bg-brand text-black border-brand"
+                          : "bg-transparent text-zinc-400 border-white/10 hover:text-white"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  {timeFilter === "DAY" && dayFilterIso && (
+                    <span className="text-xs px-3 py-1.5 rounded-full border border-brand/40 text-brand">
+                      Dzień {dayFilterIso}
+                    </span>
+                  )}
                   {["ALL", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED"].map((k) => (
                     <button
                       key={k}
@@ -372,7 +580,7 @@ export default function PanelPage() {
                           : "bg-transparent text-zinc-400 border-white/10 hover:border-white/25 hover:text-white"
                       }`}
                     >
-                      {k === "ALL" ? "Wszystkie" : k}
+                      {k === "ALL" ? "Status: wszystkie" : k}
                     </button>
                   ))}
                 </div>
@@ -389,63 +597,88 @@ export default function PanelPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/[0.06]">
-                    {filteredBookings.map((b) => {
-                      const st = statusMeta(b.status);
-                      return (
-                        <tr key={b.id}>
-                          <td className="py-3 pr-2 text-white">{machineName(b.machine_id)}</td>
-                          <td className="py-3 pr-2 text-xs text-zinc-400">
-                            {new Date(b.start_time).toLocaleString("pl-PL", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </td>
-                          <td className="py-3 pr-2 tabular-nums">{b.total_price_net} zł</td>
-                          <td className="py-3 pr-2">
-                            <span className={`text-[11px] px-2 py-1 rounded-full ${st.cls}`}>{st.label}</span>
-                          </td>
-                          <td className="py-3 text-right space-x-1">
-                            <a
-                              href={`${API_URL}/bookings/${b.id}/pdf`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs bg-white/[0.08] px-2.5 py-1 rounded-full"
+                    {filteredBookings.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center text-sm text-zinc-500">
+                          Brak zleceń dla wybranych filtrów.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredBookings.map((b) => {
+                        const st = statusMeta(b.status);
+                        const selected = selectedBookingId === b.id;
+                        return (
+                          <tr
+                            key={b.id}
+                            className={selected ? "bg-white/[0.04]" : undefined}
+                            onClick={() => setSelectedBookingId(b.id)}
+                          >
+                            <td className="py-3 pr-2 text-white">{machineName(b.machine_id)}</td>
+                            <td className="py-3 pr-2 text-xs text-zinc-400">
+                              {new Date(b.start_time).toLocaleString("pl-PL", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                              {" → "}
+                              {new Date(b.end_time).toLocaleString("pl-PL", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </td>
+                            <td className="py-3 pr-2 tabular-nums">{b.total_price_net} zł</td>
+                            <td className="py-3 pr-2">
+                              <span className={`text-[11px] px-2 py-1 rounded-full ${st.cls}`}>
+                                {st.label}
+                              </span>
+                            </td>
+                            <td
+                              className="py-3 text-right space-x-1"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              PDF
-                            </a>
-                            {b.status === "CONFIRMED" && (
-                              <button
-                                type="button"
-                                onClick={() => handleStatusChange(b.id, "IN_PROGRESS")}
-                                className="text-xs text-brand px-2 py-1"
+                              <a
+                                href={`${API_URL}/bookings/${b.id}/pdf`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs bg-white/[0.08] px-2.5 py-1 rounded-full"
                               >
-                                Start
-                              </button>
-                            )}
-                            {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
-                              <>
+                                PDF
+                              </a>
+                              {b.status === "CONFIRMED" && (
                                 <button
                                   type="button"
-                                  onClick={() => handleStatusChange(b.id, "COMPLETED")}
-                                  className="text-xs text-sky-300 px-2 py-1"
+                                  onClick={() => handleStatusChange(b.id, "IN_PROGRESS")}
+                                  className="text-xs text-brand px-2 py-1"
                                 >
-                                  Zakończ
+                                  Start
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStatusChange(b.id, "CANCELLED")}
-                                  className="text-xs text-rose-300 px-2 py-1"
-                                >
-                                  Anuluj
-                                </button>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                              )}
+                              {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(b.id, "COMPLETED")}
+                                    className="text-xs text-sky-300 px-2 py-1"
+                                  >
+                                    Zakończ
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(b.id, "CANCELLED")}
+                                    className="text-xs text-rose-300 px-2 py-1"
+                                  >
+                                    Anuluj
+                                  </button>
+                                </>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -573,8 +806,12 @@ export default function PanelPage() {
                 <div className="flex flex-wrap gap-x-5 gap-y-1">
                     <span>Platforma demo — praca inżynierska</span>
                     <span>Zdjęcia: Wikimedia Commons (CC)</span>
-                    <span>Regulamin</span>
-                    <span>Polityka prywatności</span>
+                    <Link href="/regulamin" className="hover:text-zinc-400 transition">
+                      Regulamin
+                    </Link>
+                    <Link href="/polityka-prywatnosci" className="hover:text-zinc-400 transition">
+                      Polityka prywatności
+                    </Link>
                 </div>
                 </div>
             </div>

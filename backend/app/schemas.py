@@ -70,6 +70,17 @@ class BookingQuoteResponse(BaseModel):
 
 class BookingStatusUpdate(BaseModel):
     status: BookingStatus
+    
+    
+class BookingScheduleUpdate(BaseModel):
+    start_time: datetime
+    end_time: datetime
+    machine_id: UUID | None = None
+
+    @field_validator("start_time", "end_time", mode="after")
+    @classmethod
+    def localize_schedule_times(cls, v: datetime) -> datetime:
+        return ensure_warsaw(v)
 
 
 class HandoverCreate(BaseModel):

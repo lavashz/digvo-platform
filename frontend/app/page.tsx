@@ -13,25 +13,19 @@ import { useFlash } from "./lib/flash";
 
 /** Te same URL-e co w machineImages.ts — u Ciebie już działają w katalogu */
 const IMG = {
-  excavator:
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Caterpillar_330_excavator_on_a_pile_of_dirt.jpg/1280px-Caterpillar_330_excavator_on_a_pile_of_dirt.jpg",
-  backhoe:
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Koparko-ladowarka.jpg/1280px-Koparko-ladowarka.jpg",
-  loader:
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Volvo_L90G_loader_at_a_job_site_in_a_Palo_Alto.jpg/1280px-Volvo_L90G_loader_at_a_job_site_in_a_Palo_Alto.jpg",
-  mini:
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Bobcat_E50_mini_excavator_with_oversized_treads.jpg/1280px-Bobcat_E50_mini_excavator_with_oversized_treads.jpg",
-  liebherr:
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Bauma_2007_Excavator_Liebherr_2.jpg/1280px-Bauma_2007_Excavator_Liebherr_2.jpg",
-  tele:
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Telehandler_transporting_whisky_barrels.jpg/1280px-Telehandler_transporting_whisky_barrels.jpg",
+  excavator: "/machines/cat-excavator.jpg",
+  backhoe: "/machines/jcb-backhoe.jpg",
+  loader: "/machines/volvo-loader.jpg",
+  mini: "/machines/bobcat-mini.jpg",
+  liebherr: "/machines/liebherr.jpg",
+  tele: "/machines/telehandler.jpg",
 };
 
 const CATEGORIES = [
-  { label: "Koparki", img: IMG.excavator },
-  { label: "Koparkoładowarki", img: IMG.backhoe },
-  { label: "Ładowarki", img: IMG.loader },
-  { label: "Minikoparki", img: IMG.mini },
+  { label: "Koparki", category: "Koparki", img: IMG.excavator },
+  { label: "Koparkoładowarki", category: "Koparkoładowarki", img: IMG.backhoe },
+  { label: "Ładowarki", category: "Ładowarki", img: IMG.loader },
+  { label: "Minikoparki", category: "Minikoparki", img: IMG.mini },
 ];
 
 export default function HomePage() {
@@ -163,7 +157,7 @@ export default function HomePage() {
             {CATEGORIES.map((cat) => (
               <Link
                 key={cat.label}
-                href="/katalog"
+                href={`/katalog?category=${encodeURIComponent(cat.category)}`}
                 className="group relative block h-56 sm:h-72 overflow-hidden rounded-2xl bg-[#1a1a1c] ring-1 ring-white/10"
               >
                 <img
@@ -291,8 +285,12 @@ export default function HomePage() {
       <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
       <div className="flex flex-wrap gap-x-5 gap-y-1">
         <span>Platforma demo — praca inżynierska</span>
-        <span>Regulamin</span>
-        <span>Polityka prywatności</span>
+        <Link href="/regulamin" className="hover:text-zinc-400 transition">
+          Regulamin
+        </Link>
+        <Link href="/polityka-prywatnosci" className="hover:text-zinc-400 transition">
+          Polityka prywatności
+        </Link>
       </div>
     </div>
   </div>

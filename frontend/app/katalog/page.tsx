@@ -60,6 +60,12 @@ export default function CatalogPage() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cat = params.get("category");
+    if (cat) setCategoryFilter(cat);
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
     fetch(`${API_URL}/machines`)
       .then((r) => r.json())
@@ -78,7 +84,14 @@ export default function CatalogPage() {
       if ((m.name || "").toLowerCase().startsWith("test machine")) return false;
       const vendor = resolveMachineVendor(m);
       const matchesVendor = vendorFilter === "ALL" || vendor.id === vendorFilter;
-      const matchesCategory = categoryFilter === "ALL" || m.category === categoryFilter;
+      const matchesCategory =
+        categoryFilter === "ALL" ||
+        m.category === categoryFilter ||
+        (categoryFilter === "Koparki" &&
+          m.category.startsWith("Koparki") &&
+          !m.category.toLowerCase().includes("ładowar")) ||
+        (categoryFilter === "Ładowarki" &&
+          (m.category === "Ładowarki" || m.category.startsWith("Ładowarki")));
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !q ||
@@ -147,7 +160,7 @@ export default function CatalogPage() {
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="bg-panel-2 border border-white/[0.1] rounded-full px-4 py-3 text-sm text-white outline-none"
             >
-              {categories.map((c) => (
+              {Array.from(new Set([...categories, categoryFilter])).map((c) => (
                 <option key={c} value={c}>
                   {c === "ALL" ? t(locale, "allCategories") : c}
                 </option>
@@ -160,10 +173,15 @@ export default function CatalogPage() {
           </p>
 
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <div key={n} className="h-72 rounded-3xl skeleton" />
-              ))}
+            <div className="space-y-4">
+              <p className="text-sm text-zinc-400 text-center sm:text-left">
+                Budzimy API na Renderze — pierwsze ładowanie po przerwie może potrwać 20–60 s.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <div key={n} className="h-72 rounded-3xl skeleton" />
+                ))}
+              </div>
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-sm text-zinc-400 py-16 text-center">{t(locale, "noResults")}</p>
@@ -243,8 +261,12 @@ export default function CatalogPage() {
             <div className="flex flex-wrap gap-x-5 gap-y-1">
               <span>Platforma demo — praca inżynierska</span>
               <span>Zdjęcia: Wikimedia Commons (CC)</span>
-              <span>Regulamin</span>
-              <span>Polityka prywatności</span>
+              <Link href="/regulamin" className="hover:text-zinc-400 transition">
+                Regulamin
+              </Link>
+              <Link href="/polityka-prywatnosci" className="hover:text-zinc-400 transition">
+                Polityka prywatności
+              </Link>
             </div>
           </div>
         </div>
