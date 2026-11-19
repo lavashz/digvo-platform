@@ -38,7 +38,7 @@ export default function PanelPage() {
   const [timeFilter, setTimeFilter] = useState<"ALL" | "TODAY" | "WEEK" | "DAY">("WEEK");
   const [dayFilterIso, setDayFilterIso] = useState<string | null>(null);
   const [ganttMode, setGanttMode] = useState<"week" | "day">("week");
-  const [ganttAnchor, setGanttAnchor] = useState(() => new Date());
+  const [ganttAnchor, setGanttAnchor] = useState<Date | null>(null);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [mthInputs, setMthInputs] = useState<Record<string, string>>({});
 
@@ -59,6 +59,10 @@ export default function PanelPage() {
     const savedCurrency = localStorage.getItem("digvo_currency");
     if (savedLocale === "pl" || savedLocale === "en") setLocale(savedLocale);
     if (savedCurrency === "PLN" || savedCurrency === "EUR") setCurrency(savedCurrency);
+  }, []);
+
+  useEffect(() => {
+    setGanttAnchor(new Date());
   }, []);
 
   useEffect(() => {
@@ -105,7 +109,8 @@ export default function PanelPage() {
       x.setHours(0, 0, 0, 0);
       return x;
     };
-    const today0 = startOfDay(new Date());
+    if (!ganttAnchor) return [];
+    const today0 = startOfDay(ganttAnchor);
     const weekEnd = new Date(today0);
     weekEnd.setDate(weekEnd.getDate() + 7);
 
@@ -134,7 +139,7 @@ export default function PanelPage() {
       (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
     );
     return list;
-  }, [bookings, statusFilter, timeFilter, dayFilterIso]);
+  }, [bookings, statusFilter, timeFilter, dayFilterIso, ganttAnchor]);
 
   const selectedBooking = useMemo(
     () => bookings.find((b) => b.id === selectedBookingId) || null,
@@ -455,6 +460,7 @@ export default function PanelPage() {
               ))}
             </div>
 
+            {ganttAnchor ? (
             <FleetGantt
               machines={machines}
               bookings={bookings}
@@ -471,6 +477,9 @@ export default function PanelPage() {
                 setTimeFilter("DAY");
               }}
             />
+            ) : (
+              <div className="h-48 rounded-3xl skeleton" />
+            )}
 
             {selectedBooking && (
               <div className="rounded-3xl border border-white/[0.08] bg-[#111113] p-5 flex flex-wrap items-start justify-between gap-4">
