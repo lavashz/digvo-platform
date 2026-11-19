@@ -97,7 +97,17 @@ def collision_world(db):
         phone="+48 500 000 002",
         role=UserRole.OPERATOR,
     )
-    db.add_all([client, operator_user])
+    
+    dispatcher = User(
+    email=f"disp-{suffix}@test.digvo.local",
+    organization_id=org.id,
+    password_hash="hashed_secret_123",
+    full_name="Test Dispatcher",
+    phone="+48 500 000 003",
+    role=UserRole.DISPATCHER,
+    )
+    
+    db.add_all([client, operator_user, dispatcher])
     db.flush()
 
     op = OperatorProfile(
@@ -134,6 +144,7 @@ def collision_world(db):
         "vehicle": vehicle,
         "qual": qual,
         "suffix": suffix,
+        "dispatcher": dispatcher,
     }
     yield world
 
@@ -147,7 +158,7 @@ def collision_world(db):
     ).delete(synchronize_session=False)
     db.query(OperatorProfile).filter(OperatorProfile.user_id == operator_user.id).delete(synchronize_session=False)
     db.query(Machine).filter(Machine.organization_id == org.id).delete(synchronize_session=False)
-    db.query(User).filter(User.id.in_([client.id, operator_user.id])).delete(synchronize_session=False)
+    db.query(User).filter(User.id.in_([client.id, operator_user.id, dispatcher.id])).delete(synchronize_session=False)
     db.query(Organization).filter(Organization.id == org.id).delete(synchronize_session=False)
     db.commit()
 
@@ -169,8 +180,25 @@ def client_api(db, collision_world):
         yield c
     app.dependency_overrides.clear()
 
+@pytest.fixture()
+def dispatcher_api(db, collision_world):
+    def _override_get_db():
+        try:
+            yield db
+        finally:
+            pass
 
-def slot(day_offset: int = 30, hour_start: int = 8, hour_end: int = 16):
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=day_offset, hours=hour_start)
-    end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=day_offset, hours=hour_end)
-    return start, end
+    def _override_user():
+        return collision_world["dispatcher"]
+
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_current_user] = _override_user
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+    
+    
+    def slot(day_offset: int = 30, hour_start: int = 8, hour_end: int = 16):
+        start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=day_offset, hours=hour_start)
+        end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=day_offset, hours=hour_end)
+        return start, end
