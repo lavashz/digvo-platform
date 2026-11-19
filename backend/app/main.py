@@ -21,7 +21,6 @@ from app.schemas import (
     HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse, RegisterRequest,
     WARSAW,
 )
-)
 from app.auth import verify_password, create_access_token, get_current_user, hash_password
 
 app = FastAPI(
