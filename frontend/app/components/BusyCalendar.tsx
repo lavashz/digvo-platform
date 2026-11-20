@@ -3,11 +3,13 @@
 import { useMemo } from "react";
 
 type Props = {
-  month: Date; // dowolny dzień w miesiącu
+  month: Date;
   busyDates: Set<string>;
   startDate: string;
   endDate: string;
   onPick: (iso: string) => void;
+  onPrevMonth?: () => void;
+  onNextMonth?: () => void;
 };
 
 function iso(d: Date) {
@@ -17,12 +19,20 @@ function iso(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-export default function BusyCalendar({ month, busyDates, startDate, endDate, onPick }: Props) {
+export default function BusyCalendar({
+  month,
+  busyDates,
+  startDate,
+  endDate,
+  onPick,
+  onPrevMonth,
+  onNextMonth,
+}: Props) {
   const cells = useMemo(() => {
     const y = month.getFullYear();
     const m = month.getMonth();
     const first = new Date(y, m, 1);
-    const startPad = (first.getDay() + 6) % 7; // poniedziałek = 0
+    const startPad = (first.getDay() + 6) % 7;
     const daysInMonth = new Date(y, m + 1, 0).getDate();
     const out: { iso: string; day: number; inMonth: boolean }[] = [];
     for (let i = 0; i < startPad; i++) out.push({ iso: "", day: 0, inMonth: false });
@@ -37,9 +47,31 @@ export default function BusyCalendar({ month, busyDates, startDate, endDate, onP
 
   return (
     <div className="rounded-2xl border border-white/[0.08] bg-[#111113] p-4">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-white capitalize">{label}</p>
-        <div className="flex gap-3 text-[10px] text-zinc-500">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {onPrevMonth && (
+            <button
+              type="button"
+              onClick={onPrevMonth}
+              className="w-8 h-8 rounded-full border border-white/10 text-zinc-300 hover:text-white hover:bg-white/5"
+              aria-label="Poprzedni miesiąc"
+            >
+              ‹
+            </button>
+          )}
+          <p className="text-sm font-semibold text-white capitalize truncate">{label}</p>
+          {onNextMonth && (
+            <button
+              type="button"
+              onClick={onNextMonth}
+              className="w-8 h-8 rounded-full border border-white/10 text-zinc-300 hover:text-white hover:bg-white/5"
+              aria-label="Następny miesiąc"
+            >
+              ›
+            </button>
+          )}
+        </div>
+        <div className="flex gap-3 text-[10px] text-zinc-500 shrink-0">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-rose-500/80" /> zajęty
           </span>
@@ -58,8 +90,7 @@ export default function BusyCalendar({ month, busyDates, startDate, endDate, onP
           if (!c.inMonth) return <div key={`e-${i}`} className="h-9" />;
           const busy = busyDates.has(c.iso);
           const selected = c.iso === startDate || c.iso === endDate;
-          const inRange =
-            startDate && endDate && c.iso > startDate && c.iso < endDate;
+          const inRange = startDate && endDate && c.iso > startDate && c.iso < endDate;
           return (
             <button
               key={c.iso}

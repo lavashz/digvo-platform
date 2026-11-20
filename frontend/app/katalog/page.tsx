@@ -143,29 +143,35 @@ export default function CatalogPage() {
                 className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/60 rounded-full pl-11 pr-4 py-3 text-sm text-white outline-none"
               />
             </div>
-            <select
-              value={vendorFilter}
-              onChange={(e) => setVendorFilter(e.target.value)}
-              className="bg-panel-2 border border-white/[0.1] rounded-full px-4 py-3 text-sm text-white outline-none"
-            >
-              <option value="ALL">{t(locale, "allVendors")}</option>
-              {Object.values(VENDORS).map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.shortName}
-                </option>
-              ))}
-            </select>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-panel-2 border border-white/[0.1] rounded-full px-4 py-3 text-sm text-white outline-none"
-            >
-              {Array.from(new Set([...categories, categoryFilter])).map((c) => (
-                <option key={c} value={c}>
-                  {c === "ALL" ? t(locale, "allCategories") : c}
-                </option>
-              ))}
-            </select>
+            <label className="block">
+              <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Dostawca</span>
+              <select
+                value={vendorFilter}
+                onChange={(e) => setVendorFilter(e.target.value)}
+                className="bg-panel-2 border border-white/[0.1] rounded-full px-4 py-3 text-sm text-white outline-none w-full lg:w-auto"
+              >
+                <option value="ALL">{t(locale, "allVendors")}</option>
+                {Object.values(VENDORS).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.shortName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Kategoria</span>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="bg-panel-2 border border-white/[0.1] rounded-full px-4 py-3 text-sm text-white outline-none w-full lg:w-auto"
+              >
+                {Array.from(new Set([...categories, categoryFilter])).map((c) => (
+                  <option key={c} value={c}>
+                    {c === "ALL" ? t(locale, "allCategories") : c}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <p className="text-xs text-zinc-500 mb-5">
@@ -256,7 +262,7 @@ export default function CatalogPage() {
           </div>
         </div>
         <div className="border-t border-white/[0.06] bg-black">
-          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-600">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
             <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
             <div className="flex flex-wrap gap-x-5 gap-y-1">
               <span>Platforma demo — praca inżynierska</span>

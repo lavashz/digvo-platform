@@ -117,7 +117,7 @@ export default function SiteHeader({
               {t(locale, item.key)}
             </Link>
           ))}
-          {authUser && (authUser.role === "DISPATCHER" || authUser.role === "OPERATOR") && (
+          {authUser && (authUser.role === "DISPATCHER" || authUser.role === "OPERATOR" || authUser.role === "ADMIN") && (
             <Link
               href="/panel"
               className={`px-3.5 py-1.5 rounded-full text-[13px] font-medium transition ${
@@ -189,7 +189,7 @@ export default function SiteHeader({
                 {t(locale, item.key)}
               </Link>
             ))}
-            {authUser && (authUser.role === "DISPATCHER" || authUser.role === "OPERATOR") && (
+            {authUser && (authUser.role === "DISPATCHER" || authUser.role === "OPERATOR" || authUser.role === "ADMIN") && (
               <Link
                 href="/panel"
                 className={`px-4 py-3 rounded-xl text-[15px] font-medium ${

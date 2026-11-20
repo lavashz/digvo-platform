@@ -194,21 +194,30 @@ export default function MyBookingsPage() {
                   const v = m ? resolveMachineVendor(m) : null;
                   return (
                     <tr key={b.id} className="hover:bg-white/[0.02]">
-                      <td className="py-4 pr-3">
-                        <div className="font-medium text-white">{machineName(b.machine_id)}</div>
-                        <div className="text-[11px] text-zinc-500">{v?.shortName}</div>
-                      </td>
                       <td className="py-4 pr-3 text-xs text-zinc-300">
-                        {new Date(b.start_time).toLocaleString("pl-PL", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        <div>
+                          {new Date(b.start_time).toLocaleString("pl-PL", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                        <div className="text-zinc-500">
+                          →{" "}
+                          {new Date(b.end_time).toLocaleString("pl-PL", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
                       </td>
                       <td className="py-4 pr-3 text-xs text-zinc-300">{b.operator_name || "—"}</td>
-                      <td className="py-4 pr-3 text-xs text-zinc-300">
+                      <td
+                        className="py-4 pr-3 text-xs text-zinc-300 max-w-[12rem] truncate"
+                        title={b.delivery_address || "Odbiór z bazy"}
+                      >
                         {b.delivery_address || "Odbiór z bazy"}
                       </td>
                       <td className="py-4 pr-3 font-semibold tabular-nums">{b.total_price_net} zł</td>
@@ -265,7 +274,7 @@ export default function MyBookingsPage() {
           </div>
         </div>
         <div className="border-t border-white/[0.06] bg-black">
-          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-600">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
             <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
             <div className="flex flex-wrap gap-x-5 gap-y-1">
               <span>Platforma demo — praca inżynierska</span>

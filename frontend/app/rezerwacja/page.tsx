@@ -400,26 +400,19 @@ function BookingPage() {
                     </label>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2">
-                    <button
-                        type="button"
-                        className="text-xs text-zinc-400 hover:text-white"
-                        onClick={() =>
+                    <BusyCalendar
+                      month={calMonth}
+                      busyDates={busyDates}
+                      startDate={startDate}
+                      endDate={endDate}
+                      onPick={pickDay}
+                      onPrevMonth={() =>
                         setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1))
-                        }
-                    >
-                        ←
-                    </button>
-                    <button
-                        type="button"
-                        className="text-xs text-zinc-400 hover:text-white"
-                        onClick={() =>
+                      }
+                      onNextMonth={() =>
                         setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1))
-                        }
-                    >
-                        →
-                    </button>
-                    </div>
+                      }
+                    />
 
                     <BusyCalendar
                     month={calMonth}
@@ -558,11 +551,30 @@ function BookingPage() {
 
                 {step === 3 && (
                 <div className="space-y-4">
-                  <p className="text-sm text-zinc-400">
-                    {startDate} {startHour} → {endDate} {endHour}
-                    {withOperator ? " · operator" : ""}
-                    {withTransport ? ` · transport: ${address}` : ""}
-                  </p>
+                  <div className="rounded-2xl border border-white/[0.08] bg-black/30 p-4 space-y-2 text-sm">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-zinc-500">Termin</p>
+                      <p className="text-zinc-200 tabular-nums">
+                        {startDate} {startHour} → {endDate} {endHour}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-zinc-500">Opcje</p>
+                      <p className="text-zinc-200">
+                        {[withOperator && "operator", withTransport && "transport"]
+                          .filter(Boolean)
+                          .join(" · ") || "tylko maszyna"}
+                      </p>
+                    </div>
+                    {withTransport && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Dostawa</p>
+                        <p className="text-zinc-200 truncate" title={address}>
+                          {address || "—"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
                 <div className="rounded-2xl bg-black/40 border border-white/[0.07] p-5 space-y-2.5 text-[13px]">
                   <div className="flex justify-between text-zinc-400">
@@ -681,7 +693,7 @@ function BookingPage() {
                 </div>
             </div>
             <div className="border-t border-white/[0.06] bg-black">
-                <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-600">
+                <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
                 <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
                 <div className="flex flex-wrap gap-x-5 gap-y-1">
                     <span>Platforma demo — praca inżynierska</span>

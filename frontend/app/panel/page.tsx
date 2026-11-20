@@ -740,9 +740,10 @@ const fleetMachines = useMemo(
                       ? ` · ${selectedBooking.delivery_address}`
                       : ""}
                   </p>
-                  <p className="mt-1 text-sm tabular-nums text-zinc-300">
-                    {selectedBooking.total_price_net} zł · {selectedBooking.status}
-                  </p>
+                 <p className="mt-1 text-sm tabular-nums text-zinc-300">
+                   {selectedBooking.total_price_net} zł ·{" "}
+                   {statusMeta(selectedBooking.status).label}
+                 </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <a
@@ -835,7 +836,7 @@ const fleetMachines = useMemo(
                           : "bg-transparent text-zinc-400 border-white/10 hover:border-white/25 hover:text-white"
                       }`}
                     >
-                      {k === "ALL" ? "Status: wszystkie" : k}
+                      {k === "ALL" ? "Status: wszystkie" : statusMeta(k).label}
                     </button>
                   ))}
                 </div>
@@ -865,7 +866,7 @@ const fleetMachines = useMemo(
                         return (
                           <tr
                             key={b.id}
-                            className={selected ? "bg-white/[0.04]" : undefined}
+                            className={`${selected ? "bg-white/[0.04]" : ""} cursor-pointer hover:bg-white/[0.03]`}
                             onClick={() => setSelectedBookingId(b.id)}
                           >
                             <td className="py-3 pr-2 text-white">{machineName(b.machine_id)}</td>
@@ -1073,7 +1074,7 @@ const fleetMachines = useMemo(
                 </div>
             </div>
             <div className="border-t border-white/[0.06] bg-black">
-                <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-600">
+                <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
                 <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
                 <div className="flex flex-wrap gap-x-5 gap-y-1">
                     <span>Platforma demo — praca inżynierska</span>

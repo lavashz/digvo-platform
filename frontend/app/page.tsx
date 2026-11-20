@@ -131,7 +131,7 @@ export default function HomePage() {
             ].map(([k, v]) => (
               <div key={v} className="flex items-baseline gap-2">
                 <span className="text-brand font-semibold text-lg tabular-nums">{k}</span>
-                <span className="text-zinc-500">{v}</span>
+                <span className="text-zinc-400">{v}</span>
               </div>
             ))}
           </div>
@@ -171,7 +171,7 @@ export default function HomePage() {
                   <p className="text-white font-semibold text-base sm:text-lg tracking-tight">
                     {cat.label}
                   </p>
-                  <p className="mt-1 text-[11px] text-brand font-medium opacity-0 group-hover:opacity-100 transition">
+                  <p className="mt-1 text-[11px] text-brand font-medium opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
                     Przeglądaj →
                   </p>
                 </div>
@@ -281,7 +281,7 @@ export default function HomePage() {
   </div>
 
   <div className="border-t border-white/[0.06] bg-black">
-    <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-600">
+    <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
       <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
       <div className="flex flex-wrap gap-x-5 gap-y-1">
         <span>Platforma demo — praca inżynierska</span>
