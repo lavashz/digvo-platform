@@ -720,8 +720,6 @@ def update_booking_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in (UserRole.DISPATCHER, UserRole.ADMIN):
-        raise HTTPException(status_code=403, detail="Tylko dyspozytor może zmieniać status zlecenia.")
 
     booking = db.get(Booking, booking_id)
     if not booking:
@@ -740,9 +738,7 @@ def update_booking_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role not in (UserRole.DISPATCHER, UserRole.ADMIN):
-        raise HTTPException(status_code=403, detail="Tylko dyspozytor może zmieniać harmonogram zlecenia.")
-
+    
     if payload.end_time <= payload.start_time:
         raise HTTPException(status_code=400, detail="Data zakończenia musi być późniejsza niż rozpoczęcia.")
 
@@ -750,11 +746,30 @@ def update_booking_schedule(
     if not booking:
         raise HTTPException(status_code=404, detail="Nie znaleziono rezerwacji.")
 
+    is_staff = current_user.role in (UserRole.DISPATCHER, UserRole.ADMIN)
+    is_owner = (
+        current_user.role == UserRole.CLIENT
+        and booking.client_id == current_user.id
+    )
+    if not is_staff and not is_owner:
+        raise HTTPException(status_code=403, detail="Brak uprawnień do zmiany harmonogramu.")
+
+    if is_owner and not is_staff:
+        expected_end = booking.end_time + timedelta(days=1)
+        same_start = abs((payload.start_time - booking.start_time).total_seconds()) < 2
+        same_machine = payload.machine_id is None or payload.machine_id == booking.machine_id
+        same_end = abs((payload.end_time - expected_end).total_seconds()) < 2
+        if not (same_start and same_machine and same_end):
+            raise HTTPException(
+                status_code=400,
+                detail="Możesz tylko przedłużyć rezerwację o dokładnie 1 dzień.",
+            )
+
     if booking.status == BookingStatus.CANCELLED:
         raise HTTPException(status_code=409, detail="Nie można przesuwać anulowanej rezerwacji.")
     if booking.status == BookingStatus.COMPLETED:
         raise HTTPException(status_code=409, detail="Nie można przesuwać zakończonej rezerwacji.")
-
+    
     target_machine_id = payload.machine_id or booking.machine_id
     machine = db.execute(
         select(Machine)
@@ -769,6 +784,8 @@ def update_booking_schedule(
             status_code=409,
             detail=f"Maszyna ma nieważny przegląd UDT (ważny do {machine.udt_valid_until.isoformat()}).",
         )
+
+    buffer = timedelta(hours=machine.service_buffer_hours)
 
     buffer = timedelta(hours=machine.service_buffer_hours)
     machine_block = db.execute(

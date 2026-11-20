@@ -6,12 +6,12 @@ import LoginModal from "../components/LoginModal";
 import SiteHeader from "../components/SiteHeader";
 import { FileIcon } from "../components/Icons";
 import { useAuth } from "../lib/auth";
-import { API_URL, authHeaders } from "../lib/api";
 import { DEMO_ACCOUNTS, resolveMachineVendor, statusMeta } from "../lib/vendors";
 import type { Booking, Machine } from "../lib/types";
 import { t, type Locale, type Currency } from "../lib/i18n";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
+import { API_URL, authHeaders, formatApiError } from "../lib/api";
 
 export default function MyBookingsPage() {
   const {
@@ -66,6 +66,49 @@ export default function MyBookingsPage() {
       .catch(() => setBookings([]))
       .finally(() => setLoading(false));
   }, [authUser]);
+
+  const toLocalIso = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+  };
+
+  const reloadMine = () => {
+    if (!authUser) return;
+    setLoading(true);
+    fetch(`${API_URL}/bookings/my`, { headers: authHeaders(authUser.token) })
+      .then((r) => r.json())
+      .then((d) => setBookings(Array.isArray(d) ? d : []))
+      .catch(() => setBookings([]))
+      .finally(() => setLoading(false));
+  };
+
+  const extendOneDay = async (b: Booking) => {
+    if (!authUser) return;
+    if (b.status !== "CONFIRMED" && b.status !== "IN_PROGRESS") {
+      show("Można przedłużyć tylko aktywne zlecenie.", "error");
+      return;
+    }
+    const start = new Date(b.start_time);
+    const end = new Date(b.end_time);
+    end.setDate(end.getDate() + 1);
+    const res = await fetch(`${API_URL}/bookings/${b.id}/schedule`, {
+      method: "PATCH",
+      headers: authHeaders(authUser.token),
+      body: JSON.stringify({
+        start_time: toLocalIso(start),
+        end_time: toLocalIso(end),
+        machine_id: b.machine_id,
+      }),
+    });
+    
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      show("Przedłużono o 1 dzień. Cena przeliczona.");
+      reloadMine();
+    } else {
+      show(formatApiError(data.detail, "Nie udało się przedłużyć."), "error");
+    }
+  };
 
   const machineName = (id: string) => machines.find((m) => m.id === id)?.name || "Maszyna";
 
@@ -141,7 +184,7 @@ export default function MyBookingsPage() {
                   <th className="pb-3 font-medium">Dostawa</th>
                   <th className="pb-3 font-medium">Netto</th>
                   <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 font-medium text-right">PDF</th>
+                  <th className="pb-3 font-medium text-right">Akcje</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
@@ -174,7 +217,16 @@ export default function MyBookingsPage() {
                           {st.label}
                         </span>
                       </td>
-                      <td className="py-4 text-right">
+                      <td className="py-4 text-right space-x-1 whitespace-nowrap">
+                        {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
+                          <button
+                            type="button"
+                            onClick={() => extendOneDay(b)}
+                            className="inline-flex items-center text-xs border border-brand/40 text-brand hover:bg-brand hover:text-black px-3 py-1.5 rounded-full transition"
+                          >
+                            +1 dzień
+                          </button>
+                        )}
                         <a
                           href={`${API_URL}/bookings/${b.id}/pdf`}
                           target="_blank"
