@@ -114,6 +114,7 @@ function BookingPage() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const { flash, show, clear } = useFlash();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
   useEffect(() => {
     const savedLocale = localStorage.getItem("digvo_locale");
@@ -234,6 +235,7 @@ function BookingPage() {
 
   const handleBooking = async (e: FormEvent) => {
     e.preventDefault();
+    if (step !== 3) return;
     if (!machine) return;
     if (!authUser) {
       setShowLogin(true);
@@ -342,6 +344,36 @@ function BookingPage() {
                 onSubmit={handleBooking}
                 className="rounded-3xl border border-white/[0.09] bg-panel p-6 sm:p-7 space-y-4"
               >
+                <div className="flex items-center gap-2 mb-2">
+                  {(
+                    [
+                      [1, "Termin"],
+                      [2, "Opcje"],
+                      [3, "Potwierdź"],
+                    ] as const
+                  ).map(([n, label]) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => {
+                        if (n < step) setStep(n);
+                      }}
+                      className={`flex-1 text-center rounded-full py-2 text-xs font-medium border transition ${
+                        step === n
+                          ? "bg-brand text-black border-brand"
+                          : step > n
+                            ? "bg-white/10 text-white border-white/20"
+                            : "bg-transparent text-zinc-500 border-white/10"
+                      }`}
+                    >
+                      {n}. {label}
+                    </button>
+                  ))}
+                </div>
+
+                {step === 1 && (
+                <div className="space-y-4">
+                
                 <div className="grid grid-cols-2 gap-3">
                     <label className="block text-xs text-zinc-500">
                         Od dnia
@@ -420,6 +452,20 @@ function BookingPage() {
                       </label>
                     </div>
 
+                        <button
+                          type="button"
+                          onClick={() => setStep(2)}
+                          disabled={!startDate || !endDate || endDate < startDate}
+                          className="w-full bg-brand text-black font-semibold py-3.5 rounded-full disabled:opacity-50"
+                        >
+                          Dalej — opcje →
+                        </button>
+                        </div>
+                        )}
+
+                        {step === 2 && (
+                        <div className="space-y-4">
+
                 <ToggleRow
                   checked={withOperator}
                   onChange={setWithOperator}
@@ -491,6 +537,33 @@ function BookingPage() {
                   </div>
                 )}
 
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="flex-1 border border-white/15 text-zinc-300 py-3 rounded-full text-sm"
+                  >
+                    ← Wstecz
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="flex-[2] bg-brand text-black font-semibold py-3 rounded-full"
+                  >
+                    Dalej — podsumowanie →
+                  </button>
+                </div>
+                </div>
+                )}
+
+                {step === 3 && (
+                <div className="space-y-4">
+                  <p className="text-sm text-zinc-400">
+                    {startDate} {startHour} → {endDate} {endHour}
+                    {withOperator ? " · operator" : ""}
+                    {withTransport ? ` · transport: ${address}` : ""}
+                  </p>
+
                 <div className="rounded-2xl bg-black/40 border border-white/[0.07] p-5 space-y-2.5 text-[13px]">
                   <div className="flex justify-between text-zinc-400">
                     <span>
@@ -554,6 +627,14 @@ function BookingPage() {
                 )}
 
                 <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="w-full border border-white/15 text-zinc-300 py-3 rounded-full text-sm"
+                >
+                  ← Wstecz do opcji
+                </button>
+
+                <button
                   type="submit"
                   disabled={loading || (quote != null && !quote.available)}
                   className="w-full bg-brand hover:bg-brand-soft disabled:opacity-50 text-black font-semibold py-4 rounded-full text-[15px] transition press flex items-center justify-center gap-2"
@@ -572,6 +653,8 @@ function BookingPage() {
                   <FileIcon className="w-3.5 h-3.5" />
                   PDF
                 </p>
+                </div>
+                )}
               </form>
             </div>
           </div>

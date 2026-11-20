@@ -35,11 +35,12 @@ export default function PanelPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [blocks, setBlocks] = useState<UnavailabilityBlock[]>([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [timeFilter, setTimeFilter] = useState<"ALL" | "TODAY" | "WEEK" | "DAY">("WEEK");
+  const [timeFilter, setTimeFilter] = useState<"ALL" | "TODAY" | "WEEK" | "DAY">("TODAY");
   const [dayFilterIso, setDayFilterIso] = useState<string | null>(null);
   const [ganttMode, setGanttMode] = useState<"week" | "day">("week");
   const [ganttAnchor, setGanttAnchor] = useState<Date | null>(null);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [dispatcherTab, setDispatcherTab] = useState<"schedule" | "fleet">("schedule");
   const [mthInputs, setMthInputs] = useState<Record<string, string>>({});
 
   const [blockMachineId, setBlockMachineId] = useState("");
@@ -279,6 +280,36 @@ export default function PanelPage() {
     }
   };
 
+  const operatorJobs = useMemo(() => {
+  return bookings
+    .filter((b) => b.status !== "CANCELLED")
+    .map((b) => {
+      const pickup = b.protocols.find((p) => p.protocol_type === "PICKUP");
+      const ret = b.protocols.find((p) => p.protocol_type === "RETURN");
+      const nextAction: "PICKUP" | "RETURN" | null = !pickup
+        ? "PICKUP"
+        : !ret
+          ? "RETURN"
+          : null;
+      return { b, pickup, ret, nextAction };
+    })
+    .sort((a, c) => {
+      const pa = a.nextAction ? 0 : 1;
+      const pc = c.nextAction ? 0 : 1;
+      if (pa !== pc) return pa - pc;
+      return (
+        new Date(a.b.start_time).getTime() - new Date(c.b.start_time).getTime()
+      );
+    });
+}, [bookings]);
+
+const pendingPickups = operatorJobs.filter((j) => j.nextAction === "PICKUP").length;
+const pendingReturns = operatorJobs.filter((j) => j.nextAction === "RETURN").length;
+const fleetMachines = useMemo(
+  () => machines.filter((m) => !/^test\s/i.test(m.name)),
+  [machines]
+);
+
   const isStaff =
     authUser &&
     (authUser.role === "DISPATCHER" || authUser.role === "OPERATOR" || authUser.role === "ADMIN");
@@ -334,13 +365,14 @@ export default function PanelPage() {
             </Link>
           </div>
         ) : authUser.role === "OPERATOR" ? (
+
             loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {[1, 2].map((n) => (
                     <div key={n} className="h-48 rounded-3xl skeleton" />
                 ))}
                 </div>
-            ) : bookings.filter((b) => b.status !== "CANCELLED").length === 0 ? (
+            ) : operatorJobs.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-white/[0.12] bg-[#111113] p-10 text-center">
                 <p className="text-lg font-semibold text-white">Brak aktywnych zleceń</p>
                 <p className="mt-2 text-sm text-zinc-400">
@@ -349,20 +381,38 @@ export default function PanelPage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4 max-w-lg mx-auto w-full pb-24">
-                {bookings
-                    .filter((b) => b.status !== "CANCELLED")
-                    .map((b) => {
-                    const pickup = b.protocols.find((p) => p.protocol_type === "PICKUP");
-                    const ret = b.protocols.find((p) => p.protocol_type === "RETURN");
+                {(pendingPickups > 0 || pendingReturns > 0) && (
+                  <p className="text-center text-sm text-zinc-400">
+                    {pendingPickups > 0 && (
+                      <span className="text-brand font-medium">{pendingPickups} do odbioru</span>
+                    )}
+                    {pendingPickups > 0 && pendingReturns > 0 && " · "}
+                    {pendingReturns > 0 && (
+                      <span className="text-sky-300 font-medium">{pendingReturns} do zwrotu</span>
+                    )}
+                  </p>
+                )}
+                {operatorJobs.map(({ b, pickup, ret, nextAction }, idx) => {
                     const st = statusMeta(b.status);
-                    const nextAction = !pickup ? "PICKUP" : !ret ? "RETURN" : null;
+                    const isNext =
+                      nextAction != null &&
+                      operatorJobs.findIndex((j) => j.nextAction) === idx;
                     return (
                         <div
                           key={b.id}
-                          className="rounded-3xl border border-white/[0.08] bg-[#111113] p-5 sm:p-6 space-y-5"
+                          className={`rounded-3xl border bg-[#111113] p-5 sm:p-6 space-y-5 ${
+                            isNext
+                              ? "border-brand/50 ring-1 ring-brand/30"
+                              : "border-white/[0.08]"
+                          }`}
                         >
                         <div className="flex justify-between gap-3">
                             <div className="min-w-0">
+                            {isNext && (
+                              <p className="text-[11px] uppercase tracking-wider text-brand font-semibold mb-1">
+                                Następne
+                              </p>
+                            )}
                             <h2 className="text-xl font-semibold text-white leading-tight">
                               {machineName(b.machine_id)}
                             </h2>
@@ -394,14 +444,14 @@ export default function PanelPage() {
 
                         <div className="grid grid-cols-2 gap-px bg-white/[0.07] rounded-2xl overflow-hidden">
                             <div className="bg-black/50 p-5">
-                            <span className="text-xs text-zinc-500 uppercase tracking-wide">PICKUP</span>
+                            <span className="text-xs text-zinc-500 uppercase tracking-wide">Odbiór</span>
                             <div className="text-emerald-400 font-semibold text-2xl mt-2 tabular-nums">
                                 {pickup ? `${pickup.engine_hours_reading}` : "—"}
                             </div>
                             <div className="text-xs text-zinc-500 mt-0.5">mth</div>
                             </div>
                             <div className="bg-black/50 p-5">
-                            <span className="text-xs text-zinc-500 uppercase tracking-wide">RETURN</span>
+                            <span className="text-xs text-zinc-500 uppercase tracking-wide">Zwrot</span>
                             <div className="text-sky-400 font-semibold text-2xl mt-2 tabular-nums">
                                 {ret ? `${ret.engine_hours_reading}` : "—"}
                             </div>
@@ -430,7 +480,7 @@ export default function PanelPage() {
                                 onClick={() => handleHandover(b.id, nextAction)}
                                 className="w-full min-h-[52px] bg-brand text-black font-bold text-base rounded-2xl active:scale-[0.99] transition"
                             >
-                                Zapisz {nextAction}
+                                {nextAction === "PICKUP" ? "Zapisz odbiór" : "Zapisz zwrot"}
                             </button>
                             </div>
                         )}
@@ -459,6 +509,38 @@ export default function PanelPage() {
                 </div>
               ))}
             </div>
+              
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex rounded-full border border-white/10 p-0.5">
+                  {(
+                    [
+                      ["schedule", "Harmonogram"],
+                      ["fleet", "Flota i blokady"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setDispatcherTab(id)}
+                      className={`text-sm px-4 py-2 rounded-full transition ${
+                        dispatcherTab === id
+                          ? "bg-white text-black font-semibold"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-zinc-500">
+                  {dispatcherTab === "schedule"
+                    ? "Plan dnia: Gantt + lista zleceń"
+                    : "Dodawanie maszyn i blokady UDT / serwis"}
+                </p>
+              </div>
+
+              {dispatcherTab === "schedule" && (
+              <>
 
             {ganttAnchor ? (
             <FleetGantt
@@ -693,7 +775,11 @@ export default function PanelPage() {
                 </table>
               </div>
             </div>
+            </>
+            )}
 
+            {dispatcherTab === "fleet" && (
+            <>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <form
                 onSubmit={handleCreateMachine}
@@ -743,12 +829,17 @@ export default function PanelPage() {
                   className={`${INPUT_CLS} rounded-2xl`}
                   value={blockMachineId}
                   onChange={(e) => setBlockMachineId(e.target.value)}
+                  disabled={fleetMachines.length === 0}
                 >
-                  {machines.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
+                  {fleetMachines.length === 0 ? (
+                    <option value="">Brak maszyn — dodaj po lewej</option>
+                  ) : (
+                    fleetMachines.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))
+                  )}
                 </select>
                 <div className="grid grid-cols-2 gap-3">
                   <input
@@ -772,7 +863,12 @@ export default function PanelPage() {
                   Zablokuj
                 </button>
                 <ul className="space-y-2 max-h-48 overflow-y-auto scroll-thin pt-2">
-                  {blocks.map((bl) => (
+                  {blocks.length === 0 ? (
+                    <li className="text-xs text-zinc-500 px-1 py-2">
+                      Brak aktywnych blokad.
+                    </li>
+                  ) : (
+                    blocks.map((bl) => (
                     <li
                       key={bl.id}
                       className="flex justify-between gap-2 text-xs bg-black/40 rounded-xl px-3 py-2"
@@ -782,13 +878,16 @@ export default function PanelPage() {
                         Usuń
                       </button>
                     </li>
-                  ))}
+                    ))
+                  )}
                 </ul>
               </form>
+              </div>
+              </>
+              )}
+            </>
+            )}
             </div>
-          </>
-          )}
-          </div>
         </main>
 
         <footer className="border-t border-white/[0.06] mt-auto">
