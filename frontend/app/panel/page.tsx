@@ -462,7 +462,7 @@ export default function PanelPage() {
 
             {ganttAnchor ? (
             <FleetGantt
-              machines={machines}
+              machines={machines.filter((m) => !/^test\s/i.test(m.name))}
               bookings={bookings}
               blocks={blocks}
               viewMode={ganttMode}
