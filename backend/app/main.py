@@ -1,6 +1,7 @@
 import math
 from fastapi.responses import Response
 from app.pdf_generator import generate_booking_pdf
+from app.mailer import send_booking_confirmation
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
@@ -640,6 +641,27 @@ def create_booking(
             status_code=409,
             detail="Konflikt terminów! Maszyna, operator lub transport zostali właśnie zarezerwowani.",
         )
+        
+    try:
+        client = current_user
+        operator = None
+        if new_booking.operator_id:
+            operator = db.get(User, new_booking.operator_id)
+        protocols = []
+        pdf_bytes = generate_booking_pdf(
+            new_booking, machine, client, operator, protocols
+        )
+        send_booking_confirmation(
+            to_email=current_user.email,
+            booking_id=str(new_booking.id),
+            machine_name=machine.name,
+            start_time=new_booking.start_time.isoformat(sep=" ", timespec="minutes"),
+            end_time=new_booking.end_time.isoformat(sep=" ", timespec="minutes"),
+            total_net=str(new_booking.total_price_net),
+            pdf_bytes=pdf_bytes,
+        )
+    except Exception:
+        pass
 
     return BookingResponse(
         id=new_booking.id,
@@ -708,6 +730,7 @@ def update_booking_status(
     booking.status = payload.status
     db.commit()
     db.refresh(booking)
+    
     return {"id": str(booking.id), "status": booking.status.value}
 
 @app.patch("/bookings/{booking_id}/schedule")
