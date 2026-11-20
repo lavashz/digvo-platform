@@ -262,7 +262,7 @@ function BookingPage() {
         if (!res.ok) {
             show(formatApiError(data.detail, "Błąd rezerwacji."), "error");
         } else {
-            show(`Potwierdzono. Netto: ${data.total_price_net} PLN.`, "success");
+            show("Rezerwacja potwierdzona. Umowa PDF też w e-mailu (jeśli skonfigurowano).");
             window.setTimeout(() => router.push("/moje-rezerwacje"), 900);
         }
       } catch {
