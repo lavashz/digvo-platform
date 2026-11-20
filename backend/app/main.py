@@ -907,29 +907,19 @@ def create_handover_protocol(
     if existing:
         raise HTTPException(status_code=409, detail=f"Protokół typu {payload.protocol_type} został już sporządzony.")
 
-    if payload.protocol_type == "RETURN":
-        pickup = db.execute(
-            select(HandoverProtocol).where(
-                HandoverProtocol.booking_id == booking_id,
-                HandoverProtocol.protocol_type == "PICKUP"
-            )
-        ).scalar_one_or_none()
-        if not pickup:
-            raise HTTPException(
-                status_code=400,
-                detail="Najpierw należy sporządzić protokół wydania (PICKUP)."
-            )
-        if payload.engine_hours_reading < pickup.engine_hours_reading:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Stan licznika przy zwrocie ({payload.engine_hours_reading} mth) nie może być niższy niż przy wydaniu ({pickup.engine_hours_reading} mth)."
-            )
-        
+    media: dict = {}
+    if payload.notes:
+        media["notes"] = payload.notes
+    if payload.photo_data_url:
+        media["meter_photo"] = payload.photo_data_url
+    if payload.signature_data_url:
+        media["signature"] = payload.signature_data_url
+
     protocol = HandoverProtocol(
         booking_id=booking_id,
         protocol_type=payload.protocol_type,
         engine_hours_reading=payload.engine_hours_reading,
-        photos_urls={"notes": payload.notes} if payload.notes else {}
+        photos_urls=media,
     )
     db.add(protocol)
 

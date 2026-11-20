@@ -92,6 +92,17 @@ def generate_booking_pdf(
         pdf.cell(0, 6, f"Przepracowane motogodziny w trakcie zlecenia: {worked} mth", new_x="LMARGIN", new_y="NEXT")
 
     pdf.ln(18)
+    
+    def _has_media(p, key: str) -> bool:
+        if not p or not isinstance(p.photos_urls, dict):
+            return False
+        return bool(p.photos_urls.get(key))
+
+    pdf.set_font("Helvetica", "", 10)
+    if _has_media(pickup, "meter_photo") or _has_media(ret, "meter_photo"):
+        pdf.cell(0, 6, "Zalaczone zdjecie licznika: TAK", new_x="LMARGIN", new_y="NEXT")
+    if _has_media(pickup, "signature") or _has_media(ret, "signature"):
+        pdf.cell(0, 6, "Podpis elektroniczny operatora: TAK", new_x="LMARGIN", new_y="NEXT")
 
     # Podpisy
     pdf.set_font("Helvetica", "", 9)

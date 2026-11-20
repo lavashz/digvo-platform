@@ -87,6 +87,8 @@ class HandoverCreate(BaseModel):
     protocol_type: str = Field(..., pattern="^(PICKUP|RETURN)$", example="PICKUP")
     engine_hours_reading: Decimal = Field(..., ge=0, example=1450.5)
     notes: str | None = Field(default=None, example="Maszyna zatankowana do pełna, brak uszkodzeń.")
+    photo_data_url: str | None = Field(default=None, max_length=900_000)
+    signature_data_url: str | None = Field(default=None, max_length=400_000)
 
 
 class BlockCreate(BaseModel):

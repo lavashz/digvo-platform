@@ -42,6 +42,8 @@ export default function PanelPage() {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [dispatcherTab, setDispatcherTab] = useState<"schedule" | "fleet">("schedule");
   const [mthInputs, setMthInputs] = useState<Record<string, string>>({});
+  const [handoverPhotos, setHandoverPhotos] = useState<Record<string, string>>({});
+  const [handoverSigs, setHandoverSigs] = useState<Record<string, string>>({});
 
   const [blockMachineId, setBlockMachineId] = useState("");
   const [blockDate, setBlockDate] = useState("2027-01-15");
@@ -255,11 +257,60 @@ export default function PanelPage() {
     }
   };
 
-  const handleHandover = async (bookingId: string, protocolType: "PICKUP" | "RETURN") => {
+  const compressImage = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 960;
+          const scale = Math.min(1, maxW / img.width);
+          const c = document.createElement("canvas");
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          const ctx = c.getContext("2d");
+          if (!ctx) return reject(new Error("canvas"));
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          resolve(c.toDataURL("image/jpeg", 0.65));
+        };
+        img.onerror = reject;
+        img.src = String(reader.result);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const readSignature = (canvas: HTMLCanvasElement | null): string | null => {
+    if (!canvas) return null;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let ink = false;
+    for (let i = 3; i < pixels.length; i += 4) {
+      if (pixels[i] > 0) {
+        ink = true;
+        break;
+      }
+    }
+    if (!ink) return null;
+    return canvas.toDataURL("image/png");
+  };
+
+ const handleHandover = async (bookingId: string, protocolType: "PICKUP" | "RETURN") => {
     if (!authUser) return;
     const val = mthInputs[bookingId];
     if (!val || isNaN(Number(val))) {
       show("Wpisz poprawny odczyt mth.", "error");
+      return;
+    }
+    const photo = handoverPhotos[bookingId];
+    const sig = handoverSigs[bookingId];
+    if (!photo) {
+      show("Dodaj zdjęcie licznika.", "error");
+      return;
+    }
+    if (!sig) {
+      show("Złóż podpis na polu poniżej.", "error");
       return;
     }
     const res = await fetch(`${API_URL}/bookings/${bookingId}/handover`, {
@@ -268,12 +319,24 @@ export default function PanelPage() {
       body: JSON.stringify({
         protocol_type: protocolType,
         engine_hours_reading: Number(val),
+        photo_data_url: photo,
+        signature_data_url: sig,
       }),
     });
     const data = await res.json();
     if (res.ok) {
       show(data.message || "Zapisano protokół.");
       setMthInputs((p) => ({ ...p, [bookingId]: "" }));
+      setHandoverPhotos((p) => {
+        const n = { ...p };
+        delete n[bookingId];
+        return n;
+      });
+      setHandoverSigs((p) => {
+        const n = { ...p };
+        delete n[bookingId];
+        return n;
+      });
       reload();
     } else {
       show(formatApiError(data.detail, "Błąd protokołu."), "error");
@@ -475,6 +538,106 @@ const fleetMachines = useMemo(
                                 }
                                 className={`${INPUT_CLS} w-full rounded-2xl px-5 py-4 text-lg tabular-nums`}
                             />
+
+                                <div className="space-y-2">
+                                  <label className="block text-xs text-zinc-500 uppercase tracking-wide">
+                                    Zdjęcie licznika
+                                  </label>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    className="block w-full text-sm text-zinc-400 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-white"
+                                    onChange={async (e) => {
+                                      const f = e.target.files?.[0];
+                                      if (!f) return;
+                                      try {
+                                        const url = await compressImage(f);
+                                        setHandoverPhotos((p) => ({ ...p, [b.id]: url }));
+                                      } catch {
+                                        show("Nie udało się wczytać zdjęcia.", "error");
+                                      }
+                                    }}
+                                  />
+                                  {handoverPhotos[b.id] && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={handoverPhotos[b.id]}
+                                      alt="Licznik"
+                                      className="mt-2 w-full max-h-40 object-cover rounded-xl border border-white/10"
+                                    />
+                                  )}
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <label className="text-xs text-zinc-500 uppercase tracking-wide">
+                                      Podpis
+                                    </label>
+                                    <button
+                                      type="button"
+                                      className="text-xs text-zinc-400"
+                                      onClick={() => {
+                                        const c = document.getElementById(
+                                          `sig-${b.id}`
+                                        ) as HTMLCanvasElement | null;
+                                        const ctx = c?.getContext("2d");
+                                        if (c && ctx) {
+                                          ctx.clearRect(0, 0, c.width, c.height);
+                                        }
+                                        setHandoverSigs((p) => {
+                                          const n = { ...p };
+                                          delete n[b.id];
+                                          return n;
+                                        });
+                                      }}
+                                    >
+                                      Wyczyść
+                                    </button>
+                                  </div>
+                                  <canvas
+                                    id={`sig-${b.id}`}
+                                    width={360}
+                                    height={140}
+                                    className="w-full h-36 rounded-xl bg-white touch-none"
+                                    onPointerDown={(e) => {
+                                      const c = e.currentTarget;
+                                      const ctx = c.getContext("2d");
+                                      if (!ctx) return;
+                                      c.setPointerCapture(e.pointerId);
+                                      ctx.strokeStyle = "#111";
+                                      ctx.lineWidth = 2.5;
+                                      ctx.lineCap = "round";
+                                      ctx.beginPath();
+                                      const r = c.getBoundingClientRect();
+                                      ctx.moveTo(
+                                        ((e.clientX - r.left) / r.width) * c.width,
+                                        ((e.clientY - r.top) / r.height) * c.height
+                                      );
+                                    }}
+                                    onPointerMove={(e) => {
+                                      if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+                                      const c = e.currentTarget;
+                                      const ctx = c.getContext("2d");
+                                      if (!ctx) return;
+                                      const r = c.getBoundingClientRect();
+                                      ctx.lineTo(
+                                        ((e.clientX - r.left) / r.width) * c.width,
+                                        ((e.clientY - r.top) / r.height) * c.height
+                                      );
+                                      ctx.stroke();
+                                    }}
+                                    onPointerUp={(e) => {
+                                      const c = e.currentTarget;
+                                      c.releasePointerCapture(e.pointerId);
+                                      const data = readSignature(c);
+                                      if (data) {
+                                        setHandoverSigs((p) => ({ ...p, [b.id]: data }));
+                                      }
+                                    }}
+                                  />
+                                </div>
+                            
                             <button
                                 type="button"
                                 onClick={() => handleHandover(b.id, nextAction)}
