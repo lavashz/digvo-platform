@@ -414,14 +414,6 @@ function BookingPage() {
                       }
                     />
 
-                    <BusyCalendar
-                    month={calMonth}
-                    busyDates={busyDates}
-                    startDate={startDate}
-                    endDate={endDate}
-                    onPick={pickDay}
-                    />
-
                     <div className="grid grid-cols-2 gap-3">
                       <label className="block text-xs text-zinc-500">
                           Od (godzina)
