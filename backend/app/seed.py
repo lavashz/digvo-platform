@@ -159,6 +159,17 @@ def run_seed():
             phone="+48 500 100 200",
             role=UserRole.DISPATCHER,
         )
+        
+        get_or_create_user(
+            db,
+            email="admin@digvo.pl",
+            organization_id=kujawy.id,
+            password_hash="hashed_secret_123",
+            full_name="Admin Digvo",
+            phone="+48 500 000 001",
+            role=UserRole.ADMIN,
+        )
+        
         op1_user = get_or_create_user(
             db,
             email="j.kowalski@kujawy-maszyny.pl",
