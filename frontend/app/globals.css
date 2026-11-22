@@ -16,6 +16,27 @@
 
 :root {
   color-scheme: dark;
+  accent-color: #ffb800;
+}
+
+button,
+input,
+select,
+textarea {
+  accent-color: #ffb800;
+}
+
+/* Android: mniej „systemowego” wyglądu pól */
+input[type="date"],
+input[type="time"],
+input[type="number"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+input[type="text"],
+select,
+textarea {
+  color-scheme: dark;
 }
 
 html {
