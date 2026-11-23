@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { API_URL } from "../lib/api";
 import {
   ChevronRightIcon,
   EyeIcon,
@@ -23,6 +24,7 @@ export interface RegisterPayload {
   password: string;
   full_name: string;
   phone: string;
+  nip?: string;
 }
 
 interface LoginModalProps {
@@ -71,6 +73,9 @@ export default function LoginModal({
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [nip, setNip] = useState("");
+  const [nipHint, setNipHint] = useState<string | null>(null);
+  const [nipBusy, setNipBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
@@ -99,6 +104,8 @@ export default function LoginModal({
       setPassword("");
       setFullName("");
       setPhone("");
+      setNip("");
+      setNipHint(null);
     }
   }, [open]);
 
@@ -121,6 +128,7 @@ export default function LoginModal({
             password,
             full_name: fullName.trim(),
             phone: phone.trim(),
+            nip: nip.trim() || undefined,
           });
     setBusy(false);
     if (ok) setPassword("");
@@ -230,8 +238,59 @@ export default function LoginModal({
                     className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
                   />
                 </label>
+
+                <label className="block">
+                  <span className="sr-only">NIP firmy</span>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={nip}
+                      onChange={(e) => {
+                        setNip(e.target.value);
+                        setNipHint(null);
+                        if (error) onClearError();
+                      }}
+                      placeholder="NIP firmy (opcjonalnie)"
+                      className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
+                    />
+                    <button
+                      type="button"
+                      disabled={nipBusy || nip.replace(/\D/g, "").length < 10}
+                      onClick={async () => {
+                        setNipBusy(true);
+                        setNipHint(null);
+                        try {
+                          
+                          const res = await fetch(
+                            `${API_URL}/auth/nip/${encodeURIComponent(nip.trim())}`
+                          );
+                          const data = await res.json();
+                          if (!data.ok) {
+                            setNipHint(data.error || "Nie znaleziono NIP.");
+                          } else {
+                            setNipHint(
+                              [data.name, data.status_vat].filter(Boolean).join(" · ")
+                            );
+                            if (data.name && !fullName.trim()) setFullName(data.name);
+                          }
+                        } catch {
+                          setNipHint("Błąd połączenia z weryfikacją NIP.");
+                        }
+                        setNipBusy(false);
+                      }}
+                      className="shrink-0 px-3 rounded-2xl bg-white/[0.08] hover:bg-white/[0.14] disabled:opacity-40 text-xs font-medium text-white"
+                    >
+                      {nipBusy ? "…" : "Sprawdź"}
+                    </button>
+                  </div>
+                  {nipHint && (
+                    <p className="mt-1.5 text-[12px] text-zinc-400 px-1">{nipHint}</p>
+                  )}
+                </label>
               </>
             )}
+
 
             <label className="block">
               <span className="sr-only">Adres e-mail</span>

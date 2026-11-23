@@ -14,15 +14,18 @@ from app.database import SessionLocal
 from app.models import (
     User, UserRole, Machine, OperatorProfile, TransportVehicle,
     OperatorQualification, Booking, BookingStatus,
-    UnavailabilityBlock, HandoverProtocol, Qualification
+    UnavailabilityBlock, HandoverProtocol, Qualification, Organization,
 )
 from app.schemas import (
     BookingCreate, BookingResponse, BookingQuoteResponse, BookingStatusUpdate,
     BookingScheduleUpdate,
     HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse, RegisterRequest,
+    NipLookupResponse,
     WARSAW,
 )
 from app.auth import verify_password, create_access_token, get_current_user, hash_password
+
+from app.nip_lookup import lookup_nip, normalize_nip, nip_checksum_ok
 
 app = FastAPI(
     title="Digvo API",
@@ -276,6 +279,11 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     )
     
 
+@app.get("/auth/nip/{nip}", response_model=NipLookupResponse)
+def auth_lookup_nip(nip: str):
+    return NipLookupResponse(**lookup_nip(nip))
+    
+
 @app.post("/auth/register", response_model=TokenResponse, status_code=201)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     email = payload.email.strip().lower()
@@ -283,16 +291,50 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=409, detail="Konto z tym adresem e-mail już istnieje.")
 
+    organization_id = None
+    full_name = payload.full_name.strip()
+
+    nip_raw = (payload.nip or "").strip()
+    if nip_raw:
+        info = lookup_nip(nip_raw)
+        if not info["ok"]:
+            raise HTTPException(status_code=400, detail=info["error"] or "Nieprawidłowy NIP.")
+        nip = info["nip"]
+        org = db.execute(
+            select(Organization).where(Organization.tax_id == nip)
+        ).scalar_one_or_none()
+        if org is None:
+            org_name = info["name"] or full_name
+            org = Organization(
+                name=org_name,
+                tax_id=nip,
+                is_vendor=False,
+            )
+            db.add(org)
+            db.flush()
+        organization_id = org.id
+        if info["name"] and (
+            full_name.lower() in ("", "firma", "nazwa firmy")
+            or full_name == payload.email
+        ):
+            full_name = info["name"]
+        elif info["name"] and len(full_name) < 3:
+            full_name = info["name"]
+
     user = User(
         email=email,
         password_hash=hash_password(payload.password),
-        full_name=payload.full_name.strip(),
+        full_name=full_name,
         phone=payload.phone.strip(),
         role=UserRole.CLIENT,
-        organization_id=None,
+        organization_id=organization_id,
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Konflikt danych przy rejestracji (e-mail lub NIP).")
     db.refresh(user)
 
     token = create_access_token(user.id, user.role.value)

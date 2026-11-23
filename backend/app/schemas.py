@@ -130,6 +130,16 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=6)
     full_name: str = Field(min_length=2, max_length=255)
     phone: str = Field(min_length=6, max_length=32)
+    nip: str | None = Field(default=None, max_length=32)
+
+
+class NipLookupResponse(BaseModel):
+    ok: bool
+    nip: str
+    name: str | None = None
+    address: str | None = None
+    status_vat: str | None = None
+    error: str | None = None
 
 
 class TokenResponse(BaseModel):
