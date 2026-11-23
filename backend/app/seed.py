@@ -155,11 +155,31 @@ def run_seed():
             email="dyspozytor@kujawy-maszyny.pl",
             organization_id=kujawy.id,
             password_hash="hashed_secret_123",
-            full_name="Marek Wiśniewski (Dyspozytor Floty)",
+            full_name="Marek Wiśniewski (Dyspozytor Kujawy)",
             phone="+48 500 100 200",
             role=UserRole.DISPATCHER,
         )
         
+        get_or_create_user(
+            db,
+            email="dyspozytor@terrarent-bydgoszcz.pl",
+            organization_id=terrarent.id,
+            password_hash="hashed_secret_123",
+            full_name="Ewa Jabłońska (Dyspozytor TerraRent)",
+            phone="+48 500 200 300",
+            role=UserRole.DISPATCHER,
+        )
+
+        get_or_create_user(
+            db,
+            email="dyspozytor@budlift.pl",
+            organization_id=budlift.id,
+            password_hash="hashed_secret_123",
+            full_name="Tomasz Maj (Dyspozytor Budlift)",
+            phone="+48 500 200 400",
+            role=UserRole.DISPATCHER,
+        )
+                
         get_or_create_user(
             db,
             email="admin@digvo.pl",

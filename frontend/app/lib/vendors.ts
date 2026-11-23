@@ -81,7 +81,9 @@ export const DEMO_ACCOUNTS = [
   { label: "Klient B2B: Aqua-Instal Fordon", email: "biuro@aquainstal-fordon.pl", role: "CLIENT" },
   { label: "Klient: Tomasz Zieliński (Inwestor Fordon)", email: "inwestor@budowa-fordon.pl", role: "CLIENT" },
   { label: "Admin Digvo", email: "admin@digvo.pl", role: "ADMIN" },
-  { label: "Dyspozytor Floty: Marek Wiśniewski", email: "dyspozytor@kujawy-maszyny.pl", role: "DISPATCHER" },
+  { label: "Dyspozytor Kujawy: Marek Wiśniewski", email: "dyspozytor@kujawy-maszyny.pl", role: "DISPATCHER" },
+  { label: "Dyspozytor TerraRent: Ewa Jabłońska", email: "dyspozytor@terrarent-bydgoszcz.pl", role: "DISPATCHER" },
+  { label: "Dyspozytor Budlift: Tomasz Maj", email: "dyspozytor@budlift.pl", role: "DISPATCHER" },
   { label: "Operator UDT: Jan Kowalski", email: "j.kowalski@kujawy-maszyny.pl", role: "OPERATOR" },
   { label: "Operator UDT: Piotr Nowak", email: "p.nowak@terrarent-bydgoszcz.pl", role: "OPERATOR" },
 ];
