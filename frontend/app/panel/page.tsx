@@ -26,6 +26,7 @@ export default function PanelPage() {
     logout,
     performLogin,
     performRegister,
+    performVendorRegister,
     quickLogin,
   } = useAuth();
 
@@ -74,28 +75,38 @@ export default function PanelPage() {
   }, [locale, currency]);
 
   const reload = async () => {
+    if (!authUser?.token) return;
     setLoading(true);
     try {
-        const [mRes, bRes, blRes] = await Promise.all([
+      const headers = authHeaders(authUser.token);
+      const [mRes, bRes, blRes] = await Promise.all([
         fetch(`${API_URL}/machines`),
-        fetch(`${API_URL}/bookings`),
-        fetch(`${API_URL}/blocks`),
-        ]);
-        const mData = await mRes.json();
-        const bData = await bRes.json();
-        const blData = await blRes.json();
-        setMachines(Array.isArray(mData) ? mData : []);
-        setBookings(Array.isArray(bData) ? bData : []);
-        setBlocks(Array.isArray(blData) ? blData : []);
-        if (Array.isArray(mData) && mData[0] && !blockMachineId) {
-        setBlockMachineId(mData[0].id);
-        }
+        fetch(`${API_URL}/bookings`, { headers }),
+        fetch(`${API_URL}/blocks`, { headers }),
+      ]);
+      const mData = await mRes.json();
+      const bData = await bRes.json();
+      const blData = await blRes.json();
+
+      let machinesList: Machine[] = Array.isArray(mData) ? mData : [];
+      if (authUser.role !== "ADMIN" && authUser.organization_id) {
+        machinesList = machinesList.filter(
+          (m) => m.organization_id === authUser.organization_id
+        );
+      }
+
+      setMachines(machinesList);
+      setBookings(Array.isArray(bData) ? bData : []);
+      setBlocks(Array.isArray(blData) ? blData : []);
+      if (machinesList[0] && !blockMachineId) {
+        setBlockMachineId(machinesList[0].id);
+      }
     } catch {
-        show("Nie udało się pobrać danych panelu.", "error");
+      show("Nie udało się pobrać danych panelu.", "error");
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-    };
+  };
 
   useEffect(() => {
     if (authUser && (authUser.role === "DISPATCHER" || authUser.role === "OPERATOR" || authUser.role === "ADMIN")) {
@@ -1098,6 +1109,7 @@ const fleetMachines = useMemo(
         onClearError={clearLoginError}
         onLogin={performLogin}
         onRegister={performRegister}
+        onVendorRegister={performVendorRegister}
         onQuickLogin={quickLogin}
       />
     </div>

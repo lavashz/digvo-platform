@@ -20,12 +20,39 @@ from app.schemas import (
     BookingCreate, BookingResponse, BookingQuoteResponse, BookingStatusUpdate,
     BookingScheduleUpdate,
     HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse, RegisterRequest,
-    NipLookupResponse,
+    NipLookupResponse, VendorRegisterRequest,
     WARSAW,
 )
 from app.auth import verify_password, create_access_token, get_current_user, hash_password
 
 from app.nip_lookup import lookup_nip, normalize_nip, nip_checksum_ok
+
+
+def _token_response(user: User) -> TokenResponse:
+    return TokenResponse(
+        access_token=create_access_token(user.id, user.role.value),
+        user_id=user.id,
+        full_name=user.full_name,
+        role=user.role.value,
+        organization_id=user.organization_id,
+    )
+
+
+def _machine_in_scope(user: User, machine: Machine) -> bool:
+    if user.role == UserRole.ADMIN:
+        return True
+    if not user.organization_id:
+        return False
+    return machine.organization_id == user.organization_id
+
+
+def _assert_machine_scope(user: User, machine: Machine) -> None:
+    if not _machine_in_scope(user, machine):
+        raise HTTPException(
+            status_code=403,
+            detail="Brak dostępu do zasobów tej wypożyczalni.",
+        )
+        
 
 app = FastAPI(
     title="Digvo API",
@@ -270,13 +297,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             detail="Nieprawidłowy adres e-mail lub hasło."
         )
 
-    token = create_access_token(user.id, user.role.value)
-    return TokenResponse(
-        access_token=token,
-        user_id=user.id,
-        full_name=user.full_name,
-        role=user.role.value
-    )
+    return _token_response(user)
     
 
 @app.get("/auth/nip/{nip}", response_model=NipLookupResponse)
@@ -337,13 +358,54 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Konflikt danych przy rejestracji (e-mail lub NIP).")
     db.refresh(user)
 
-    token = create_access_token(user.id, user.role.value)
-    return TokenResponse(
-        access_token=token,
-        user_id=user.id,
-        full_name=user.full_name,
-        role=user.role.value,
+    return _token_response(user)
+
+
+@app.post("/vendors/register", response_model=TokenResponse, status_code=201)
+def register_vendor(payload: VendorRegisterRequest, db: Session = Depends(get_db)):
+    email = payload.email.strip().lower()
+    existing = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Konto z tym adresem e-mail już istnieje.")
+
+    info = lookup_nip(payload.nip)
+    if not info["ok"]:
+        raise HTTPException(status_code=400, detail=info["error"] or "Nieprawidłowy NIP.")
+
+    nip = info["nip"]
+    org = db.execute(
+        select(Organization).where(Organization.tax_id == nip)
+    ).scalar_one_or_none()
+    if org is None:
+        org = Organization(
+            name=info["name"] or payload.full_name.strip(),
+            tax_id=nip,
+            is_vendor=True,
+        )
+        db.add(org)
+        db.flush()
+    else:
+        if not org.is_vendor:
+            org.is_vendor = True
+        if info["name"]:
+            org.name = info["name"]
+
+    user = User(
+        email=email,
+        password_hash=hash_password(payload.password),
+        full_name=payload.full_name.strip(),
+        phone=payload.phone.strip(),
+        role=UserRole.DISPATCHER,
+        organization_id=org.id,
     )
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Konflikt danych przy rejestracji wypożyczalni.")
+    db.refresh(user)
+    return _token_response(user)
 
 
 @app.get("/machines")
@@ -720,11 +782,24 @@ def create_booking(
     )
 
 @app.get("/bookings")
-def list_bookings(db: Session = Depends(get_db)):
-    bookings = db.execute(
-        select(Booking).order_by(Booking.start_time.desc())
-    ).scalars().all()
+def list_bookings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in (UserRole.DISPATCHER, UserRole.OPERATOR, UserRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Brak dostępu do listy rezerwacji.")
 
+    q = (
+        select(Booking)
+        .join(Machine, Booking.machine_id == Machine.id)
+        .order_by(Booking.start_time.desc())
+    )
+    if current_user.role != UserRole.ADMIN:
+        if not current_user.organization_id:
+            return []
+        q = q.where(Machine.organization_id == current_user.organization_id)
+
+    bookings = db.execute(q).scalars().unique().all()
     users_map = {u.id: u.full_name for u in db.execute(select(User)).scalars().all()}
 
     result = []
@@ -766,6 +841,11 @@ def update_booking_status(
     booking = db.get(Booking, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Nie znaleziono rezerwacji.")
+    
+    machine = db.get(Machine, booking.machine_id)
+    if not machine:
+        raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
+    _assert_machine_scope(current_user, machine)
 
     booking.status = payload.status
     db.commit()
@@ -820,6 +900,9 @@ def update_booking_schedule(
     ).scalars().first()
     if not machine:
         raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
+    
+    if is_staff:
+        _assert_machine_scope(current_user, machine)
 
     if machine.udt_valid_until and machine.udt_valid_until < payload.end_time.date():
         raise HTTPException(
@@ -955,6 +1038,11 @@ def create_handover_protocol(
     booking = db.get(Booking, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Nie znaleziono rezerwacji.")
+    
+    machine = db.get(Machine, booking.machine_id)
+    if not machine:
+        raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
+    _assert_machine_scope(current_user, machine)
 
     existing = db.execute(
         select(HandoverProtocol).where(
@@ -995,15 +1083,31 @@ def create_handover_protocol(
 
 
 @app.get("/blocks")
-def list_blocks(db: Session = Depends(get_db)):
-    blocks = db.execute(select(UnavailabilityBlock).order_by(UnavailabilityBlock.start_time.asc())).scalars().all()
+def list_blocks(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in (UserRole.DISPATCHER, UserRole.OPERATOR, UserRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Brak dostępu do blokad.")
+
+    q = (
+        select(UnavailabilityBlock)
+        .join(Machine, UnavailabilityBlock.machine_id == Machine.id)
+        .order_by(UnavailabilityBlock.start_time.asc())
+    )
+    if current_user.role != UserRole.ADMIN:
+        if not current_user.organization_id:
+            return []
+        q = q.where(Machine.organization_id == current_user.organization_id)
+
+    blocks = db.execute(q).scalars().unique().all()
     return [
         {
             "id": str(bl.id),
             "machine_id": str(bl.machine_id) if bl.machine_id else None,
             "start_time": bl.start_time.isoformat(),
             "end_time": bl.end_time.isoformat(),
-            "reason": bl.reason.value
+            "reason": bl.reason.value,
         }
         for bl in blocks
     ]
@@ -1024,7 +1128,8 @@ def create_block(
     machine = db.get(Machine, payload.machine_id)
     if not machine:
         raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
-
+    
+    _assert_machine_scope(current_user, machine)
     block = UnavailabilityBlock(
         machine_id=payload.machine_id,
         start_time=payload.start_time,
@@ -1068,6 +1173,11 @@ def delete_block(
     block = db.get(UnavailabilityBlock, block_id)
     if not block:
         raise HTTPException(status_code=404, detail="Nie znaleziono blokady.")
+
+    if block.machine_id:
+        m = db.get(Machine, block.machine_id)
+        if m:
+            _assert_machine_scope(current_user, m)
 
     db.delete(block)
     db.commit()
@@ -1122,6 +1232,12 @@ def create_machine(
 ):
     if current_user.role not in (UserRole.DISPATCHER, UserRole.ADMIN):
         raise HTTPException(status_code=403, detail="Tylko dyspozytor może dodawać maszyny do floty.")
+    
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Konto bez organizacji wypożyczalni — zarejestruj vendor albo użyj konta z org.",
+        )
 
     qual = db.execute(select(Qualification)).scalars().first()
     qual_id = qual.id if qual else 1

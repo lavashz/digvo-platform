@@ -71,6 +71,7 @@ export interface AuthUser {
   token: string;
   full_name: string;
   role: "CLIENT" | "DISPATCHER" | "OPERATOR" | "ADMIN";
+  organization_id?: string | null;
 }
 
 export interface VendorInfo {

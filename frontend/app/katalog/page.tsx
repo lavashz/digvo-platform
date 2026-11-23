@@ -25,6 +25,7 @@ export default function CatalogPage() {
     logout,
     performLogin,
     performRegister,
+    performVendorRegister,
     quickLogin,
   } = useAuth();
 
@@ -288,6 +289,7 @@ export default function CatalogPage() {
         onClearError={clearLoginError}
         onLogin={performLogin}
         onRegister={performRegister}
+        onVendorRegister={performVendorRegister}
         onQuickLogin={quickLogin}
       />
     </div>

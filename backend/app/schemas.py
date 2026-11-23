@@ -148,3 +148,12 @@ class TokenResponse(BaseModel):
     user_id: UUID
     full_name: str
     role: str
+    organization_id: UUID | None = None
+    
+    
+class VendorRegisterRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=6)
+    full_name: str = Field(min_length=2, max_length=255)
+    phone: str = Field(min_length=6, max_length=32)
+    nip: str = Field(min_length=10, max_length=32)

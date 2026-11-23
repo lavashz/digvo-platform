@@ -39,6 +39,7 @@ export default function HomePage() {
     logout,
     performLogin,
     performRegister,
+    performVendorRegister,
     quickLogin,
   } = useAuth();
 
@@ -311,6 +312,11 @@ export default function HomePage() {
         }}
         onRegister={async (payload) => {
           const ok = await performRegister(payload);
+          if (ok) show(t(locale, "accountCreated"), "success");
+          return ok;
+        }}
+        onVendorRegister={async (payload) => {
+          const ok = await performVendorRegister(payload);
           if (ok) show(t(locale, "accountCreated"), "success");
           return ok;
         }}

@@ -88,6 +88,7 @@ function BookingPage() {
     logout,
     performLogin,
     performRegister,
+    performVendorRegister,
     quickLogin,
   } = useAuth();
 
@@ -709,6 +710,7 @@ function BookingPage() {
         onClearError={clearLoginError}
         onLogin={performLogin}
         onRegister={performRegister}
+        onVendorRegister={performVendorRegister}
         onQuickLogin={quickLogin}
       />
     </div>

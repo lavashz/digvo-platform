@@ -35,6 +35,7 @@ interface LoginModalProps {
   onClearError: () => void;
   onLogin: (email: string, password: string) => Promise<boolean>;
   onRegister: (payload: RegisterPayload) => Promise<boolean>;
+  onVendorRegister: (payload: RegisterPayload & { nip: string }) => Promise<boolean>;
   onQuickLogin: (email: string) => Promise<boolean>;
 }
 
@@ -66,7 +67,9 @@ export default function LoginModal({
   onClearError,
   onLogin,
   onRegister,
+  onVendorRegister,
   onQuickLogin,
+
 }: LoginModalProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -76,6 +79,7 @@ export default function LoginModal({
   const [nip, setNip] = useState("");
   const [nipHint, setNipHint] = useState<string | null>(null);
   const [nipBusy, setNipBusy] = useState(false);
+  const [asVendor, setAsVendor] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
@@ -106,6 +110,7 @@ export default function LoginModal({
       setPhone("");
       setNip("");
       setNipHint(null);
+      setAsVendor(false);
     }
   }, [open]);
 
@@ -123,13 +128,21 @@ export default function LoginModal({
     const ok =
       mode === "login"
         ? await onLogin(email.trim(), password)
-        : await onRegister({
-            email: email.trim(),
-            password,
-            full_name: fullName.trim(),
-            phone: phone.trim(),
-            nip: nip.trim() || undefined,
-          });
+        : asVendor
+          ? await onVendorRegister({
+              email: email.trim(),
+              password,
+              full_name: fullName.trim(),
+              phone: phone.trim(),
+              nip: nip.trim(),
+            })
+          : await onRegister({
+              email: email.trim(),
+              password,
+              full_name: fullName.trim(),
+              phone: phone.trim(),
+              nip: nip.trim() || undefined,
+            });
     setBusy(false);
     if (ok) setPassword("");
   };
@@ -237,6 +250,16 @@ export default function LoginModal({
                     required
                     className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
                   />
+                </label>
+
+                <label className="flex items-center gap-2 px-1 py-1 text-[13px] text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={asVendor}
+                    onChange={(e) => setAsVendor(e.target.checked)}
+                    className="rounded border-white/20"
+                  />
+                  Rejestruję wypożyczalnię (panel dyspozytora)
                 </label>
 
                 <label className="block">
@@ -357,7 +380,8 @@ export default function LoginModal({
                 busy ||
                 !email ||
                 !password ||
-                (mode === "register" && (!fullName || !phone || password.length < 6))
+                (mode === "register" && (!fullName || !phone || password.length < 6)) ||
+                (mode === "register" && asVendor && nip.replace(/\D/g, "").length < 10)
               }
               className="w-full mt-1 bg-brand hover:bg-brand-soft disabled:opacity-40 disabled:hover:bg-brand text-black font-semibold rounded-full py-3.5 text-[15px] transition press flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
             >

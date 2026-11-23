@@ -56,6 +56,7 @@ export function useAuth() {
         token: data.access_token,
         full_name: data.full_name,
         role: data.role,
+        organization_id: data.organization_id ?? null,
       };
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userObj));
       setAuthUser(userObj);
@@ -84,6 +85,7 @@ export function useAuth() {
         token: data.access_token,
         full_name: data.full_name,
         role: data.role,
+        organization_id: data.organization_id ?? null,
       };
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userObj));
       setAuthUser(userObj);
@@ -91,6 +93,37 @@ export function useAuth() {
       return true;
     } catch {
       setLoginError("Błąd połączenia z serwerem przy rejestracji.");
+      return false;
+    }
+  };
+
+  const performVendorRegister = async (
+    payload: RegisterPayload & { nip: string }
+  ): Promise<boolean> => {
+    setLoginError(null);
+    try {
+      const res = await fetch(`${API_URL}/vendors/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoginError(formatApiError(data.detail, "Błąd rejestracji wypożyczalni."));
+        return false;
+      }
+      const userObj: AuthUser = {
+        token: data.access_token,
+        full_name: data.full_name,
+        role: data.role,
+        organization_id: data.organization_id ?? null,
+      };
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userObj));
+      setAuthUser(userObj);
+      setShowLogin(false);
+      return true;
+    } catch {
+      setLoginError("Błąd połączenia przy rejestracji wypożyczalni.");
       return false;
     }
   };
@@ -108,6 +141,7 @@ export function useAuth() {
     logout,
     performLogin,
     performRegister,
+    performVendorRegister,
     quickLogin,
   };
 }
