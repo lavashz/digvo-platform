@@ -88,37 +88,54 @@ export const DEMO_ACCOUNTS = [
   { label: "Operator UDT: Piotr Nowak", email: "p.nowak@terrarent-bydgoszcz.pl", role: "OPERATOR" },
 ];
 
-export function statusMeta(status: string) {
+export function statusMeta(status: string, locale: "pl" | "en" = "pl") {
+  const en = locale === "en";
   switch (status) {
     case "CONFIRMED":
-      return { label: "Potwierdzone", cls: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" };
+      return {
+        label: en ? "Confirmed" : "Potwierdzone",
+        cls: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+      };
     case "IN_PROGRESS":
-      return { label: "W trakcie pracy", cls: "bg-amber-500/10 text-amber-300 border border-amber-500/20" };
+      return {
+        label: en ? "In progress" : "W trakcie pracy",
+        cls: "bg-amber-500/10 text-amber-300 border border-amber-500/20",
+      };
     case "COMPLETED":
-      return { label: "Zakończone", cls: "bg-sky-500/10 text-sky-300 border border-sky-500/20" };
+      return {
+        label: en ? "Completed" : "Zakończone",
+        cls: "bg-sky-500/10 text-sky-300 border border-sky-500/20",
+      };
     case "CANCELLED":
-      return { label: "Anulowane", cls: "bg-rose-500/10 text-rose-400 border border-rose-500/20" };
+      return {
+        label: en ? "Cancelled" : "Anulowane",
+        cls: "bg-rose-500/10 text-rose-400 border border-rose-500/20",
+      };
     default:
-      return { label: "Oczekujące", cls: "bg-white/[0.06] text-zinc-300 border border-white/[0.08]" };
+      return {
+        label: en ? "Pending" : "Oczekujące",
+        cls: "bg-white/[0.06] text-zinc-300 border border-white/[0.08]",
+      };
   }
 }
 
-export function paymentMeta(status?: string) {
+export function paymentMeta(status?: string, locale: "pl" | "en" = "pl") {
+  const en = locale === "en";
   switch (status) {
     case "TRANSFER_REPORTED":
       return {
-        label: "Przelew zgłoszony",
+        label: en ? "Transfer reported" : "Przelew zgłoszony",
         cls: "bg-amber-500/10 text-amber-300 border border-amber-500/20",
       };
     case "DEPOSIT_CONFIRMED":
       return {
-        label: "Kaucja opłacona",
+        label: en ? "Deposit paid" : "Kaucja opłacona",
         cls: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
       };
     case "AWAITING_TRANSFER":
     default:
       return {
-        label: "Do przelewu",
+        label: en ? "Awaiting transfer" : "Do przelewu",
         cls: "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20",
       };
   }

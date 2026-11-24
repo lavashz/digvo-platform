@@ -155,7 +155,7 @@ export default function MyBookingsPage() {
         onLoginClick={() => setShowLogin(true)}
         onLogout={() => {
           logout();
-          show("Wylogowano.", "info");
+          show(t(locale, "loggedOut"), "info");
         }}
       />
 
@@ -163,7 +163,7 @@ export default function MyBookingsPage() {
         <h1 className="text-3xl font-semibold tracking-tight text-white">
           {t(locale, "myBookings")}
         </h1>
-        <p className="mt-2 text-sm text-zinc-400">Umowy PDF i statusy zleceń</p>
+        <p className="mt-2 text-sm text-zinc-400">{t(locale, "myBookingsSub")}</p>
 
         {!ready ? (
           <div className="mt-10 space-y-3">
@@ -173,9 +173,9 @@ export default function MyBookingsPage() {
           </div>
         ) : !authUser ? (
           <div className="mt-10 rounded-3xl border border-white/[0.08] bg-[#111113] p-10 sm:p-14 text-center">
-            <p className="text-lg font-semibold text-white tracking-tight">Zaloguj się</p>
+            <p className="text-lg font-semibold text-white tracking-tight">{t(locale, "loginTitle")}</p>
             <p className="mt-2 text-sm text-zinc-400 max-w-sm mx-auto">
-              Po zalogowaniu zobaczysz tu swoje rezerwacje, statusy i umowy PDF.
+              {t(locale, "loginBookingsHint")}
             </p>
             <button
               type="button"
@@ -193,10 +193,10 @@ export default function MyBookingsPage() {
           </div>
         ) : bookings.length === 0 ? (
           <div className="mt-10 rounded-3xl border border-dashed border-white/[0.12] bg-[#111113] p-10 sm:p-14 text-center">
-            <p className="text-lg font-semibold text-white tracking-tight">Brak rezerwacji</p>
+            <p className="text-lg font-semibold text-white tracking-tight">{t(locale, "noBookings")}</p>
             <p className="mt-2 text-sm text-zinc-400 max-w-sm mx-auto">
-              Konto <span className="text-zinc-200">{authUser.full_name}</span> nie ma jeszcze
-              żadnych zleceń. Wybierz maszynę z katalogu.
+              <span className="text-zinc-200">{authUser.full_name}</span>{" "}
+              {t(locale, "noBookingsHint")}
             </p>
             <Link
               href="/katalog"
@@ -210,18 +210,18 @@ export default function MyBookingsPage() {
             <table className="w-full min-w-[52rem] text-left text-sm">
               <thead className="border-b border-white/[0.08] text-zinc-500 text-[11px] uppercase tracking-wider">
                 <tr>
-                  <th className="pb-3 pl-3 font-medium">Maszyna</th>
-                  <th className="pb-3 font-medium">Termin</th>
-                  <th className="pb-3 font-medium">Operator</th>
-                  <th className="pb-3 font-medium">Dostawa</th>
-                  <th className="pb-3 font-medium">Netto</th>
-                  <th className="pb-3 pr-4 font-medium">Status</th>
-                  <th className="pb-3 pl-4 pr-3 font-medium text-right">Akcje</th>
+                  <th className="pb-3 pl-3 font-medium">{t(locale, "colMachine")}</th>
+                  <th className="pb-3 font-medium">{t(locale, "colTerm")}</th>
+                  <th className="pb-3 font-medium">{t(locale, "colOperator")}</th>
+                  <th className="pb-3 font-medium">{t(locale, "colDelivery")}</th>
+                  <th className="pb-3 font-medium">{t(locale, "colNet")}</th>
+                  <th className="pb-3 pr-4 font-medium">{t(locale, "colStatus")}</th>
+                  <th className="pb-3 pl-4 pr-3 font-medium text-right">{t(locale, "colActions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
                 {bookings.map((b) => {
-                  const st = statusMeta(b.status);
+                  const st = statusMeta(b.status, locale);
                   const m = machines.find((x) => x.id === b.machine_id);
                   return (
                     <tr key={b.id} className="hover:bg-white/[0.02]">
@@ -275,9 +275,9 @@ export default function MyBookingsPage() {
                       </td>
                       <td
                         className="py-4 pr-3 align-middle text-xs text-zinc-300 max-w-[12rem] truncate"
-                        title={b.delivery_address || "Odbiór z bazy"}
-                      >
-                        {b.delivery_address || "Odbiór z bazy"}
+                          title={b.delivery_address || t(locale, "pickupAtBase")}
+>
+                          {b.delivery_address || t(locale, "pickupAtBase")}
                       </td>
                       <td className="py-4 pr-3 align-middle font-semibold tabular-nums">
                         {money(b.total_price_net)}
@@ -287,8 +287,8 @@ export default function MyBookingsPage() {
                           <span className={`px-2.5 py-1 rounded-full text-[11px] ${st.cls}`}>
                             {st.label}
                           </span>
-                          <span className={`inline-flex w-fit px-2.5 py-1 rounded-full text-[11px] ${paymentMeta(b.payment_status).cls}`}>
-                            {paymentMeta(b.payment_status).label}
+                          <span className={`inline-flex w-fit px-2.5 py-1 rounded-full text-[11px] ${paymentMeta(b.payment_status, locale).cls}`}>
+                            {paymentMeta(b.payment_status, locale).label}
                           </span>
                         </div>
                       </td>
@@ -301,7 +301,7 @@ export default function MyBookingsPage() {
                               onClick={() => reportTransfer(b.id)}
                               className="inline-flex items-center text-xs font-medium border border-white/20 text-zinc-200 hover:bg-white hover:text-black px-3 py-1.5 rounded-full transition"
                             >
-                              Zgłosiłem przelew
+                              {t(locale, "reportTransfer")}
                             </button>
                           )}
                           {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
@@ -310,7 +310,7 @@ export default function MyBookingsPage() {
                               onClick={() => extendOneDay(b)}
                               className="inline-flex items-center text-xs font-medium border border-brand/40 text-brand hover:bg-brand hover:text-black px-3 py-1.5 rounded-full transition"
                             >
-                              +1 dzień
+                              {t(locale, "extendOneDay")}
                             </button>
                           )}
                           <a

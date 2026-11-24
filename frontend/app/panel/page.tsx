@@ -577,7 +577,7 @@ const fleetMachines = useMemo(
                   </p>
                 )}
                 {operatorJobs.map(({ b, pickup, ret, nextAction }, idx) => {
-                    const st = statusMeta(b.status);
+                    const st = statusMeta(b.status, locale);
                     const isNext =
                       nextAction != null &&
                       operatorJobs.findIndex((j) => j.nextAction) === idx;
@@ -863,7 +863,7 @@ const fleetMachines = useMemo(
                   </p>
                  <p className="mt-1 text-sm tabular-nums text-zinc-300">
                    {selectedBooking.total_price_net} zł ·{" "}
-                   {statusMeta(selectedBooking.status).label}
+                   {statusMeta(selectedBooking.status, locale).label}
                  </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -957,7 +957,7 @@ const fleetMachines = useMemo(
                           : "bg-transparent text-zinc-400 border-white/10 hover:border-white/25 hover:text-white"
                       }`}
                     >
-                      {k === "ALL" ? "Status: wszystkie" : statusMeta(k).label}
+                      {k === "ALL" ? t(locale, "statusFilterAll") : statusMeta(k, locale).label}
                     </button>
                   ))}
                 </div>
@@ -982,7 +982,7 @@ const fleetMachines = useMemo(
                       </tr>
                     ) : (
                       filteredBookings.map((b) => {
-                        const st = statusMeta(b.status);
+                        const st = statusMeta(b.status, locale);
                         const selected = selectedBookingId === b.id;
                         return (
                           <tr
@@ -1012,8 +1012,8 @@ const fleetMachines = useMemo(
                                 <span className={`text-[11px] px-2 py-1 rounded-full ${st.cls}`}>
                                   {st.label}
                                 </span>
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${paymentMeta(b.payment_status).cls}`}>
-                                  {paymentMeta(b.payment_status).label}
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${paymentMeta(b.payment_status, locale).cls}`}>
+                                  {paymentMeta(b.payment_status, locale).label}
                                 </span>
                               </div>
                             </td>
