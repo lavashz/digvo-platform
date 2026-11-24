@@ -13,6 +13,7 @@ import type { Machine } from "../lib/types";
 import { t, formatMoney, type Locale, type Currency } from "../lib/i18n";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
+import SoftSelect from "../components/SoftSelect";
 
 export default function CatalogPage() {
   const {
@@ -133,45 +134,46 @@ export default function CatalogPage() {
             <p className="mt-2 text-sm text-zinc-400">{t(locale, "fromVendors")}</p>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-3 lg:items-center mb-8">
-            <div className="relative flex-1 max-w-xl">
-              <SearchIcon className="w-4 h-4 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t(locale, "searchPlaceholder")}
-                className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/60 rounded-full pl-11 pr-4 py-3 text-sm text-white outline-none"
-              />
-            </div>
+          <div className="flex flex-col lg:flex-row gap-3 lg:items-end mb-8">
+            <label className="block relative flex-1 max-w-xl">
+              <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Szukaj</span>
+              <span className="relative block">
+                <SearchIcon className="w-4 h-4 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t(locale, "searchPlaceholder")}
+                  className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/60 rounded-full pl-11 pr-4 py-3 text-sm text-white outline-none"
+                />
+              </span>
+            </label>
             <label className="block">
               <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Dostawca</span>
-              <select
+              <SoftSelect
+                ariaLabel="Dostawca"
                 value={vendorFilter}
-                onChange={(e) => setVendorFilter(e.target.value)}
-                className="bg-panel-2 border border-white/[0.1] rounded-full px-4 py-3 text-sm text-white outline-none w-full lg:w-auto"
-              >
-                <option value="ALL">{t(locale, "allVendors")}</option>
-                {Object.values(VENDORS).map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.shortName}
-                  </option>
-                ))}
-              </select>
+                onChange={setVendorFilter}
+                options={[
+                  { value: "ALL", label: t(locale, "allVendors") },
+                  ...Object.values(VENDORS).map((v) => ({
+                    value: v.id,
+                    label: v.shortName,
+                  })),
+                ]}
+              />
             </label>
             <label className="block">
               <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Kategoria</span>
-              <select
+              <SoftSelect
+                ariaLabel="Kategoria"
                 value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="bg-panel-2 border border-white/[0.1] rounded-full px-4 py-3 text-sm text-white outline-none w-full lg:w-auto"
-              >
-                {Array.from(new Set([...categories, categoryFilter])).map((c) => (
-                  <option key={c} value={c}>
-                    {c === "ALL" ? t(locale, "allCategories") : c}
-                  </option>
-                ))}
-              </select>
+                onChange={setCategoryFilter}
+                options={Array.from(new Set([...categories, categoryFilter])).map((c) => ({
+                  value: c,
+                  label: c === "ALL" ? t(locale, "allCategories") : c,
+                }))}
+              />
             </label>
           </div>
 

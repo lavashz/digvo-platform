@@ -163,26 +163,43 @@ export default function SiteHeader({
 
           <button
             type="button"
-            className="md:hidden w-10 h-10 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex flex-col items-center justify-center gap-1.5"
+            className="md:hidden w-10 h-10 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex flex-col items-center justify-center gap-[5px]"
             aria-label={menuOpen ? "Zamknij menu" : "Otwórz menu"}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
           >
-            <span className={`block w-4 h-0.5 bg-white transition ${menuOpen ? "translate-y-[4px] rotate-45" : ""}`} />
-            <span className={`block w-4 h-0.5 bg-white transition ${menuOpen ? "opacity-0" : ""}`} />
-            <span className={`block w-4 h-0.5 bg-white transition ${menuOpen ? "-translate-y-[4px] -rotate-45" : ""}`} />
+            <span
+              className={`block h-0.5 w-4 origin-center rounded-full bg-white transition duration-300 ease-out ${
+                menuOpen ? "translate-y-[7px] rotate-45" : ""
+              }`}
+            />
+            <span
+              className={`block h-0.5 w-4 rounded-full bg-white transition duration-300 ease-out ${
+                menuOpen ? "scale-x-0 opacity-0" : ""
+              }`}
+            />
+            <span
+              className={`block h-0.5 w-4 origin-center rounded-full bg-white transition duration-300 ease-out ${
+                menuOpen ? "-translate-y-[7px] -rotate-45" : ""
+              }`}
+            />
           </button>
         </div>
       </div>
 
-      {menuOpen && (
-        <div className="md:hidden border-t border-white/[0.07] bg-[#0c0c0e]/98 backdrop-blur-xl">
+      <div
+        className={`md:hidden overflow-hidden border-t border-white/[0.07] bg-[#0c0c0e]/98 backdrop-blur-xl transition-[grid-template-rows,opacity] duration-300 ease-out ${
+          menuOpen ? "grid grid-rows-[1fr] opacity-100" : "grid grid-rows-[0fr] opacity-0 border-transparent"
+        }`}
+        aria-hidden={!menuOpen}
+      >
+        <div className="min-h-0 overflow-hidden">
           <nav className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-1" aria-label="Menu mobilne">
             {NAV.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-4 py-3 rounded-xl text-[15px] font-medium ${
+                className={`px-4 py-3 rounded-xl text-[15px] font-medium transition ${
                   isActive(item.href) ? "bg-white text-black" : "text-zinc-300 hover:bg-white/[0.06]"
                 }`}
               >
@@ -192,7 +209,7 @@ export default function SiteHeader({
             {authUser && (authUser.role === "DISPATCHER" || authUser.role === "OPERATOR" || authUser.role === "ADMIN") && (
               <Link
                 href="/panel"
-                className={`px-4 py-3 rounded-xl text-[15px] font-medium ${
+                className={`px-4 py-3 rounded-xl text-[15px] font-medium transition ${
                   isActive("/panel") ? "bg-white text-black" : "text-zinc-300 hover:bg-white/[0.06]"
                 }`}
               >
@@ -208,7 +225,7 @@ export default function SiteHeader({
             </div>
           </nav>
         </div>
-      )}
+      </div>
     </header>
   );
 }

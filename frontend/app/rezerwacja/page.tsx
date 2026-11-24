@@ -23,6 +23,7 @@ import { machineImageUrl } from "../lib/machineImages";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
 import BusyCalendar from "../components/BusyCalendar";
+import SoftSelect from "../components/SoftSelect";
 
   
 
@@ -98,14 +99,23 @@ function BookingPage() {
   const [machine, setMachine] = useState<Machine | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [startDate, setStartDate] = useState("2027-01-12");
-  const [endDate, setEndDate] = useState("2027-01-12");
-  const [calMonth, setCalMonth] = useState(() => new Date(2027, 0, 1));
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [calMonth, setCalMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
   const [busyDates, setBusyDates] = useState<Set<string>>(new Set());
   const [startHour, setStartHour] = useState("08:00");
   const [endHour, setEndHour] = useState("16:00");
-  const [withOperator, setWithOperator] = useState(true);
-  const [withTransport, setWithTransport] = useState(true);
+  const [withOperator, setWithOperator] = useState(false);
+  const [withTransport, setWithTransport] = useState(false);
   const [siteId, setSiteId] = useState(SITE_PRESETS[0].id);
   const [address, setAddress] = useState(SITE_PRESETS[0].address);
   const [deliveryLat, setDeliveryLat] = useState(SITE_PRESETS[0].lat);
@@ -116,6 +126,12 @@ function BookingPage() {
   const [loading, setLoading] = useState(false);
   const { flash, show, clear } = useFlash();
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [maxStep, setMaxStep] = useState<1 | 2 | 3>(1);
+
+  const goStep = (n: 1 | 2 | 3) => {
+    setStep(n);
+    setMaxStep((m) => (n > m ? n : m));
+  };
 
   useEffect(() => {
     const savedLocale = localStorage.getItem("digvo_locale");
@@ -357,19 +373,40 @@ function BookingPage() {
                       key={n}
                       type="button"
                       onClick={() => {
-                        if (n < step) setStep(n);
+                        if (n <= maxStep) goStep(n);
                       }}
                       className={`flex-1 text-center rounded-full py-2 text-xs font-medium border transition ${
                         step === n
                           ? "bg-brand text-black border-brand"
-                          : step > n
-                            ? "bg-white/10 text-white border-white/20"
-                            : "bg-transparent text-zinc-500 border-white/10"
+                          : n <= maxStep
+                            ? "bg-white/10 text-white border-white/20 cursor-pointer"
+                            : "bg-transparent text-zinc-500 border-white/10 cursor-default"
                       }`}
                     >
                       {n}. {label}
                     </button>
                   ))}
+                </div>
+
+                <div className="rounded-2xl border border-white/[0.08] bg-black/35 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">Szacunek netto</p>
+                    <p className="text-lg font-semibold text-white tabular-nums">
+                      {quoteLoading ? "…" : money(estimate.totalNet)}
+                    </p>
+                  </div>
+                  <div className="text-right text-[11px] text-zinc-500 space-y-0.5">
+                    <p>
+                      Brutto:{" "}
+                      <span className="text-zinc-300 tabular-nums">{money(estimate.totalGross)}</span>
+                    </p>
+                    <p>
+                      Kaucja:{" "}
+                      <span className="text-zinc-300 tabular-nums">
+                        {money(machine?.deposit_amount ?? 0)}
+                      </span>
+                    </p>
+                  </div>
                 </div>
 
                 {step === 1 && (
@@ -440,7 +477,7 @@ function BookingPage() {
 
                         <button
                           type="button"
-                          onClick={() => setStep(2)}
+                          onClick={() => goStep(2)}
                           disabled={!startDate || !endDate || endDate < startDate}
                           className="w-full bg-brand text-black font-semibold py-3.5 rounded-full disabled:opacity-50"
                         >
@@ -475,24 +512,23 @@ function BookingPage() {
                       <span className="flex items-center gap-1.5 text-[11px] text-zinc-400 mb-1.5">
                         <PinIcon className="w-3.5 h-3.5" /> {t(locale, "sitePreset")}
                       </span>
-                      <select
+                      <SoftSelect
+                        ariaLabel={t(locale, "sitePreset")}
+                        className="w-full"
                         value={siteId}
-                        onChange={(e) => {
-                          const preset = SITE_PRESETS.find((s) => s.id === e.target.value);
+                        onChange={(id) => {
+                          const preset = SITE_PRESETS.find((s) => s.id === id);
                           if (!preset) return;
                           setSiteId(preset.id);
                           setAddress(preset.address);
                           setDeliveryLat(preset.lat);
                           setDeliveryLng(preset.lng);
                         }}
-                        className={`${INPUT_CLS} rounded-2xl`}
-                      >
-                        {SITE_PRESETS.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
+                        options={SITE_PRESETS.map((s) => ({
+                          value: s.id,
+                          label: s.label,
+                        }))}
+                      />
                     </label>
                     <label className="block">
                       <span className="block text-[11px] text-zinc-400 mb-1.5">
@@ -526,14 +562,14 @@ function BookingPage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => goStep(1)}
                     className="flex-1 border border-white/15 text-zinc-300 py-3 rounded-full text-sm"
                   >
                     ← Wstecz
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStep(3)}
+                    onClick={() => goStep(3)}
                     className="flex-[2] bg-brand text-black font-semibold py-3 rounded-full"
                   >
                     Dalej — podsumowanie →
@@ -576,16 +612,20 @@ function BookingPage() {
                     </span>
                     <span className="text-zinc-200 tabular-nums">{money(estimate.machineCost)}</span>
                   </div>
-                  <div className="flex justify-between text-zinc-400">
-                    <span>
-                      {t(locale, "operatorFee")} ({Number(estimate.hours).toFixed(1)} {t(locale, "hoursShort")})
-                    </span>
-                    <span className="text-zinc-200 tabular-nums">{money(estimate.operatorCost)}</span>
-                  </div>
-                  <div className="flex justify-between text-zinc-400">
-                    <span>{t(locale, "logistics")}</span>
-                    <span className="text-zinc-200 tabular-nums">{money(estimate.transportCost)}</span>
-                  </div>
+                  {withOperator && (
+                    <div className="flex justify-between text-zinc-400">
+                      <span>
+                        {t(locale, "operatorFee")} ({Number(estimate.hours).toFixed(1)} {t(locale, "hoursShort")})
+                      </span>
+                      <span className="text-zinc-200 tabular-nums">{money(estimate.operatorCost)}</span>
+                    </div>
+                  )}
+                  {withTransport && (
+                    <div className="flex justify-between text-zinc-400">
+                      <span>{t(locale, "logistics")}</span>
+                      <span className="text-zinc-200 tabular-nums">{money(estimate.transportCost)}</span>
+                    </div>
+                  )}
                   <div className="pt-3.5 mt-1 border-t border-white/[0.08] flex items-baseline justify-between">
                     <span className="text-sm font-medium text-zinc-300">{t(locale, "netTotal")}</span>
                     <span className="text-3xl font-semibold text-white tabular-nums">
@@ -633,7 +673,7 @@ function BookingPage() {
 
                 <button
                   type="button"
-                  onClick={() => setStep(2)}
+                  onClick={() => goStep(2)}
                   className="w-full border border-white/15 text-zinc-300 py-3 rounded-full text-sm"
                 >
                   ← Wstecz do opcji
@@ -717,6 +757,11 @@ function BookingPage() {
   );
 }
 
+function BookingRoute() {
+  const machineId = useSearchParams().get("machine") ?? "";
+  return <BookingPage key={machineId || "none"} />;
+}
+
 export default function BookingPageWrapper() {
   return (
     <Suspense
@@ -726,7 +771,7 @@ export default function BookingPageWrapper() {
         </div>
       }
     >
-      <BookingPage />
+      <BookingRoute />
     </Suspense>
   );
 }

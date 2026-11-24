@@ -195,13 +195,13 @@ export default function MyBookingsPage() {
             <table className="w-full min-w-[52rem] text-left text-sm">
               <thead className="border-b border-white/[0.08] text-zinc-500 text-[11px] uppercase tracking-wider">
                 <tr>
-                  <th className="pb-3 font-medium">Maszyna</th>
+                  <th className="pb-3 pl-3 font-medium">Maszyna</th>
                   <th className="pb-3 font-medium">Termin</th>
                   <th className="pb-3 font-medium">Operator</th>
                   <th className="pb-3 font-medium">Dostawa</th>
                   <th className="pb-3 font-medium">Netto</th>
-                  <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 font-medium text-right">Akcje</th>
+                  <th className="pb-3 pr-4 font-medium">Status</th>
+                  <th className="pb-3 pl-4 pr-3 font-medium text-right">Akcje</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
@@ -211,7 +211,13 @@ export default function MyBookingsPage() {
                   const v = m ? resolveMachineVendor(m) : null;
                   return (
                     <tr key={b.id} className="hover:bg-white/[0.02]">
-                      <td className="py-4 pr-3 text-xs text-zinc-300">
+                      <td className="py-4 pl-3 pr-3 align-middle">
+                        <p className="text-white text-sm font-medium">{machineName(b.machine_id)}</p>
+                        {v && (
+                          <p className="text-[11px] text-zinc-500 mt-0.5">{v.shortName}</p>
+                        )}
+                      </td>
+                      <td className="py-4 pr-3 align-middle text-xs text-zinc-300">
                         <div>
                           {new Date(b.start_time).toLocaleString("pl-PL", {
                             day: "2-digit",
@@ -230,16 +236,20 @@ export default function MyBookingsPage() {
                           })}
                         </div>
                       </td>
-                      <td className="py-4 pr-3 text-xs text-zinc-300">{b.operator_name || "—"}</td>
+                      <td className="py-4 pr-3 align-middle text-xs text-zinc-300">
+                        {b.operator_name || "—"}
+                      </td>
                       <td
-                        className="py-4 pr-3 text-xs text-zinc-300 max-w-[12rem] truncate"
+                        className="py-4 pr-3 align-middle text-xs text-zinc-300 max-w-[12rem] truncate"
                         title={b.delivery_address || "Odbiór z bazy"}
                       >
                         {b.delivery_address || "Odbiór z bazy"}
                       </td>
-                      <td className="py-4 pr-3 font-semibold tabular-nums">{b.total_price_net} zł</td>
-                      <td className="py-4 pr-3">
-                        <div className="flex flex-col gap-1 items-start">
+                      <td className="py-4 pr-3 align-middle font-semibold tabular-nums">
+                        {b.total_price_net} zł
+                      </td>
+                      <td className="py-4 pr-6 align-middle">
+                        <div className="flex flex-col gap-1.5 items-start">
                           <span className={`px-2.5 py-1 rounded-full text-[11px] ${st.cls}`}>
                             {st.label}
                           </span>
@@ -248,34 +258,36 @@ export default function MyBookingsPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="py-4 text-right space-x-1 whitespace-nowrap">
-                        {(!b.payment_status || b.payment_status === "AWAITING_TRANSFER") &&
-                          b.status !== "CANCELLED" && (
-                          <button
-                            type="button"
-                            onClick={() => reportTransfer(b.id)}
-                            className="inline-flex items-center text-xs border border-white/20 text-zinc-200 hover:bg-white hover:text-black px-3 py-1.5 rounded-full transition"
+                      <td className="py-4 pl-4 pr-3 align-middle text-right">
+                        <div className="inline-flex flex-wrap justify-end gap-1.5">
+                          {(!b.payment_status || b.payment_status === "AWAITING_TRANSFER") &&
+                            b.status !== "CANCELLED" && (
+                            <button
+                              type="button"
+                              onClick={() => reportTransfer(b.id)}
+                              className="inline-flex items-center text-xs font-medium border border-white/20 text-zinc-200 hover:bg-white hover:text-black px-3 py-1.5 rounded-full transition"
+                            >
+                              Zgłosiłem przelew
+                            </button>
+                          )}
+                          {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
+                            <button
+                              type="button"
+                              onClick={() => extendOneDay(b)}
+                              className="inline-flex items-center text-xs font-medium border border-brand/40 text-brand hover:bg-brand hover:text-black px-3 py-1.5 rounded-full transition"
+                            >
+                              +1 dzień
+                            </button>
+                          )}
+                          <a
+                            href={`${API_URL}/bookings/${b.id}/pdf`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-white/[0.08] hover:bg-white hover:text-black border border-white/[0.12] px-3 py-1.5 rounded-full transition"
                           >
-                            Zgłosiłem przelew
-                          </button>
-                        )}
-                        {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
-                          <button
-                            type="button"
-                            onClick={() => extendOneDay(b)}
-                            className="inline-flex items-center text-xs border border-brand/40 text-brand hover:bg-brand hover:text-black px-3 py-1.5 rounded-full transition"
-                          >
-                            +1 dzień
-                          </button>
-                        )}
-                        <a
-                          href={`${API_URL}/bookings/${b.id}/pdf`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs bg-white/[0.08] hover:bg-white hover:text-black px-3 py-1.5 rounded-full"
-                        >
-                          <FileIcon className="w-3.5 h-3.5" /> PDF
-                        </a>
+                            <FileIcon className="w-3.5 h-3.5" /> PDF
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   );

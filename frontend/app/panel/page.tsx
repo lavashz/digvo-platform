@@ -13,6 +13,7 @@ import { t, type Locale, type Currency } from "../lib/i18n";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
 import FleetGantt from "../components/FleetGantt";
+import SoftSelect from "../components/SoftSelect";
 
 export default function PanelPage() {
   const {
@@ -777,7 +778,7 @@ const fleetMachines = useMemo(
                     href={`${API_URL}/bookings/${selectedBooking.id}/pdf`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs bg-white/[0.08] px-3 py-1.5 rounded-full"
+                    className="inline-flex items-center text-xs font-medium bg-white/[0.08] hover:bg-white hover:text-black border border-white/[0.12] px-2.5 py-1.5 rounded-full transition"
                   >
                     PDF
                   </a>
@@ -785,7 +786,7 @@ const fleetMachines = useMemo(
                     <button
                       type="button"
                       onClick={() => handleStatusChange(selectedBooking.id, "IN_PROGRESS")}
-                      className="text-xs text-brand px-3 py-1.5 rounded-full border border-brand/40"
+                      className="inline-flex items-center text-xs font-semibold border border-brand/50 text-brand hover:bg-brand hover:text-black px-2.5 py-1.5 rounded-full transition"
                     >
                       Start
                     </button>
@@ -796,14 +797,14 @@ const fleetMachines = useMemo(
                       <button
                         type="button"
                         onClick={() => handleStatusChange(selectedBooking.id, "COMPLETED")}
-                        className="text-xs text-sky-300 px-3 py-1.5"
+                        className="inline-flex items-center text-xs font-medium border border-sky-500/40 text-sky-300 hover:bg-sky-400 hover:text-black px-2.5 py-1.5 rounded-full transition"
                       >
                         Zakończ
                       </button>
                       <button
                         type="button"
                         onClick={() => handleStatusChange(selectedBooking.id, "CANCELLED")}
-                        className="text-xs text-rose-300 px-3 py-1.5"
+                        className="inline-flex items-center text-xs font-medium border border-rose-500/40 text-rose-300 hover:bg-rose-400 hover:text-black px-2.5 py-1.5 rounded-full transition"
                       >
                         Anuluj
                       </button>
@@ -872,11 +873,11 @@ const fleetMachines = useMemo(
                 <table className="w-full min-w-[48rem] text-sm text-left">
                   <thead className="text-[11px] text-zinc-500 uppercase border-b border-white/[0.08]">
                     <tr>
-                      <th className="pb-3">Maszyna</th>
+                      <th className="pb-3 pl-3">Maszyna</th>
                       <th className="pb-3">Termin</th>
                       <th className="pb-3">Kwota</th>
-                      <th className="pb-3">Status</th>
-                      <th className="pb-3 text-right">Akcje</th>
+                      <th className="pb-3 pr-4">Status</th>
+                      <th className="pb-3 pl-4 pr-3 text-right">Akcje</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/[0.06]">
@@ -896,8 +897,8 @@ const fleetMachines = useMemo(
                             className={`${selected ? "bg-white/[0.04]" : ""} cursor-pointer hover:bg-white/[0.03]`}
                             onClick={() => setSelectedBookingId(b.id)}
                           >
-                            <td className="py-3 pr-2 text-white">{machineName(b.machine_id)}</td>
-                            <td className="py-3 pr-2 text-xs text-zinc-400">
+                            <td className="py-3 pl-3 pr-2 align-middle text-white">{machineName(b.machine_id)}</td>
+                            <td className="py-3 pr-2 align-middle text-xs text-zinc-400">
                               {new Date(b.start_time).toLocaleString("pl-PL", {
                                 day: "2-digit",
                                 month: "2-digit",
@@ -912,8 +913,8 @@ const fleetMachines = useMemo(
                                 minute: "2-digit",
                               })}
                             </td>
-                            <td className="py-3 pr-2 tabular-nums">{b.total_price_net} zł</td>
-                            <td className="py-3 pr-2">
+                            <td className="py-3 pr-2 align-middle tabular-nums">{b.total_price_net} zł</td>
+                            <td className="py-3 pr-6 align-middle">
                               <div className="flex flex-col gap-1 items-start">
                                 <span className={`text-[11px] px-2 py-1 rounded-full ${st.cls}`}>
                                   {st.label}
@@ -923,56 +924,58 @@ const fleetMachines = useMemo(
                                 </span>
                               </div>
                             </td>
-                            <td
-                              className="py-3 text-right space-x-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <a
-                                href={`${API_URL}/bookings/${b.id}/pdf`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs bg-white/[0.08] px-2.5 py-1 rounded-full"
-                              >
-                                PDF
-                              </a>
+                              <td className="py-3 pl-4 pr-3 align-middle text-right">
+                                <div
+                                  className="inline-flex flex-wrap justify-end gap-1.5"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                <a
+                                  href={`${API_URL}/bookings/${b.id}/pdf`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-xs font-medium bg-white/[0.08] hover:bg-white hover:text-black border border-white/[0.12] px-2.5 py-1.5 rounded-full transition"
+                                >
+                                  PDF
+                                </a>
 
-                              {b.payment_status !== "DEPOSIT_CONFIRMED" && b.status !== "CANCELLED" && (
-                                <button
-                                  type="button"
-                                  onClick={() => setPayment(b.id, "DEPOSIT_CONFIRMED")}
-                                  className="text-xs text-emerald-400 px-2 py-1"
-                                >
-                                  Potwierdź kaucję
-                                </button>
-                              )}
-                              {b.status === "CONFIRMED" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleStatusChange(b.id, "IN_PROGRESS")}
-                                  className="text-xs text-brand px-2 py-1"
-                                >
-                                  Start
-                                </button>
-                              )}
-                              {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
-                                <>
+                                {b.payment_status !== "DEPOSIT_CONFIRMED" && b.status !== "CANCELLED" && (
                                   <button
                                     type="button"
-                                    onClick={() => handleStatusChange(b.id, "COMPLETED")}
-                                    className="text-xs text-sky-300 px-2 py-1"
+                                    onClick={() => setPayment(b.id, "DEPOSIT_CONFIRMED")}
+                                    className="inline-flex items-center text-xs font-medium border border-emerald-500/40 text-emerald-300 hover:bg-emerald-400 hover:text-black px-2.5 py-1.5 rounded-full transition"
                                   >
-                                    Zakończ
+                                    Potwierdź kaucję
                                   </button>
+                                )}
+                                {b.status === "CONFIRMED" && (
                                   <button
                                     type="button"
-                                    onClick={() => handleStatusChange(b.id, "CANCELLED")}
-                                    className="text-xs text-rose-300 px-2 py-1"
+                                    onClick={() => handleStatusChange(b.id, "IN_PROGRESS")}
+                                    className="inline-flex items-center text-xs font-semibold border border-brand/50 text-brand hover:bg-brand hover:text-black px-2.5 py-1.5 rounded-full transition"
                                   >
-                                    Anuluj
+                                    Start
                                   </button>
-                                </>
-                              )}
-                            </td>
+                                )}
+                                {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStatusChange(b.id, "COMPLETED")}
+                                      className="inline-flex items-center text-xs font-medium border border-sky-500/40 text-sky-300 hover:bg-sky-400 hover:text-black px-2.5 py-1.5 rounded-full transition"
+                                    >
+                                      Zakończ
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStatusChange(b.id, "CANCELLED")}
+                                      className="inline-flex items-center text-xs font-medium border border-rose-500/40 text-rose-300 hover:bg-rose-400 hover:text-black px-2.5 py-1.5 rounded-full transition"
+                                    >
+                                      Anuluj
+                                    </button>
+                                  </>
+                                )}
+                                </div>
+                              </td>
                           </tr>
                         );
                       })
@@ -992,35 +995,69 @@ const fleetMachines = useMemo(
                 className="rounded-3xl border border-white/[0.06] bg-[#111113] p-6 space-y-3"
               >
                 <h3 className="font-semibold text-white">Dodaj maszynę</h3>
-                <input
-                  className={`${INPUT_CLS} rounded-2xl`}
-                  placeholder="Model"
-                  value={newMachineName}
-                  onChange={(e) => setNewMachineName(e.target.value)}
-                  required
-                />
-                <input
-                  className={`${INPUT_CLS} rounded-2xl`}
-                  value={newMachineCategory}
-                  onChange={(e) => setNewMachineCategory(e.target.value)}
-                  required
-                />
+
+                <label className="block">
+                  <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Model</span>
+                  <input
+                    className={`${INPUT_CLS} rounded-2xl`}
+                    placeholder="np. Minikoparka Bobcat E27z"
+                    value={newMachineName}
+                    onChange={(e) => setNewMachineName(e.target.value)}
+                    required
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Kategoria</span>
+                  <SoftSelect
+                    ariaLabel="Kategoria maszyny"
+                    className="w-full"
+                    value={newMachineCategory}
+                    onChange={setNewMachineCategory}
+                    options={[
+                      { value: "Minikoparki", label: "Minikoparki" },
+                      { value: "Koparki gąsienicowe", label: "Koparki gąsienicowe" },
+                      { value: "Koparkoładowarki", label: "Koparkoładowarki" },
+                      { value: "Ładowarki kołowe", label: "Ładowarki kołowe" },
+                      { value: "Ładowarki teleskopowe", label: "Ładowarki teleskopowe" },
+                    ]}
+                  />
+                </label>
+
                 <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="number"
-                    className={`${INPUT_CLS} rounded-2xl`}
-                    value={newMachineRate}
-                    onChange={(e) => setNewMachineRate(e.target.value)}
-                    required
-                  />
-                  <input
-                    type="number"
-                    className={`${INPUT_CLS} rounded-2xl`}
-                    value={newMachineDeposit}
-                    onChange={(e) => setNewMachineDeposit(e.target.value)}
-                    required
-                  />
+                  <label className="block">
+                    <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Stawka / doba (zł)</span>
+                    <input
+                      type="number"
+                      className={`${INPUT_CLS} rounded-2xl`}
+                      value={newMachineRate}
+                      onChange={(e) => setNewMachineRate(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Kaucja (zł)</span>
+                    <input
+                      type="number"
+                      className={`${INPUT_CLS} rounded-2xl`}
+                      value={newMachineDeposit}
+                      onChange={(e) => setNewMachineDeposit(e.target.value)}
+                      required
+                    />
+                  </label>
                 </div>
+
+                <label className="block">
+                  <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Bufor serwisowy (h)</span>
+                  <input
+                    type="number"
+                    className={`${INPUT_CLS} rounded-2xl`}
+                    value={newMachineBuffer}
+                    onChange={(e) => setNewMachineBuffer(e.target.value)}
+                    required
+                  />
+                </label>
+
                 <button type="submit" className="w-full bg-white text-black font-semibold rounded-full py-3 text-sm">
                   Dodaj
                 </button>
@@ -1031,39 +1068,45 @@ const fleetMachines = useMemo(
                 className="rounded-3xl border border-white/[0.06] bg-[#111113] p-6 space-y-3"
               >
                 <h3 className="font-semibold text-white">Blokada UDT / serwis</h3>
-                <select
-                  className={`${INPUT_CLS} rounded-2xl`}
-                  value={blockMachineId}
-                  onChange={(e) => setBlockMachineId(e.target.value)}
-                  disabled={fleetMachines.length === 0}
-                >
-                  {fleetMachines.length === 0 ? (
-                    <option value="">Brak maszyn — dodaj po lewej</option>
-                  ) : (
-                    fleetMachines.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="date"
-                    className={`${INPUT_CLS} rounded-2xl`}
-                    value={blockDate}
-                    onChange={(e) => setBlockDate(e.target.value)}
-                    required
+                <label className="block">
+                  <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Maszyna</span>
+                  <SoftSelect
+                    ariaLabel="Maszyna do blokady"
+                    className="w-full"
+                    value={blockMachineId || ""}
+                    onChange={setBlockMachineId}
+                    options={
+                      fleetMachines.length === 0
+                        ? [{ value: "", label: "Brak maszyn — dodaj po lewej" }]
+                        : fleetMachines.map((m) => ({ value: m.id, label: m.name }))
+                    }
                   />
-                  <select
-                    className={`${INPUT_CLS} rounded-2xl`}
-                    value={blockReason}
-                    onChange={(e) => setBlockReason(e.target.value)}
-                  >
-                    <option value="MAINTENANCE">Serwis / UDT</option>
-                    <option value="VACATION">Postój</option>
-                    <option value="SICK_LEAVE">Awaria</option>
-                  </select>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Data</span>
+                    <input
+                      type="date"
+                      className={`${INPUT_CLS} rounded-2xl`}
+                      value={blockDate}
+                      onChange={(e) => setBlockDate(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Typ</span>
+                    <SoftSelect
+                      ariaLabel="Powód blokady"
+                      className="w-full"
+                      value={blockReason}
+                      onChange={setBlockReason}
+                      options={[
+                        { value: "MAINTENANCE", label: "Serwis / UDT" },
+                        { value: "VACATION", label: "Postój" },
+                        { value: "SICK_LEAVE", label: "Awaria" },
+                      ]}
+                    />
+                  </label>
                 </div>
                 <button type="submit" className="w-full bg-rose-500/80 text-white font-semibold rounded-full py-3 text-sm">
                   Zablokuj
