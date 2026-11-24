@@ -183,12 +183,18 @@ export default function LoginModal({
             D
           </div>
           <h2 id="login-title" className="mt-5 text-[1.75rem] font-semibold tracking-tight text-white leading-tight">
-            {mode === "login" ? "Zaloguj się do Digvo" : "Załóż konto klienta"}
+            {mode === "login"
+              ? "Zaloguj się do Digvo"
+              : asVendor
+                ? "Załóż konto wypożyczalni"
+                : "Załóż konto klienta"}
           </h2>
           <p className="mt-1.5 text-sm text-zinc-400 leading-relaxed">
             {mode === "login"
               ? "Rezerwuj sprzęt, zarządzaj flotą i pobieraj umowy PDF z jednego konta."
-              : "Rejestracja B2C/B2B — od razu możesz składać rezerwacje i pobierać PDF."}
+              : asVendor
+                ? "Rejestracja dostawcy — NIP wymagany, od razu dostęp do panelu floty."
+                : "Rejestracja B2C/B2B — od razu możesz składać rezerwacje i pobierać PDF."}
           </p>
 
           <div className="mt-5 flex p-1 bg-black/40 border border-white/[0.08] rounded-full">
@@ -274,7 +280,8 @@ export default function LoginModal({
                         setNipHint(null);
                         if (error) onClearError();
                       }}
-                      placeholder="NIP firmy (opcjonalnie)"
+                      placeholder={asVendor ? "NIP firmy (wymagany)" : "NIP firmy (opcjonalnie)"}
+                      required={asVendor}
                       className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-full px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
                     />
                     <button

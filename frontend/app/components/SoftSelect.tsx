@@ -21,7 +21,9 @@ export default function SoftSelect({
 }: SoftSelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const current = options.find((o) => o.value === value) ?? options[0];
+  const current =
+    options.find((o) => o.value === value) ??
+    (value ? { value, label: value } : options[0]);
 
   useEffect(() => {
     if (!open) return;

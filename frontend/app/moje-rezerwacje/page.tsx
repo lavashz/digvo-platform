@@ -8,11 +8,12 @@ import { FileIcon } from "../components/Icons";
 import { useAuth } from "../lib/auth";
 import { DEMO_ACCOUNTS, resolveMachineVendor, statusMeta, paymentMeta } from "../lib/vendors";
 import type { Booking, Machine } from "../lib/types";
-import { t, type Locale, type Currency } from "../lib/i18n";
+import { t, formatMoney, type Locale, type Currency } from "../lib/i18n";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
 import { API_URL, authHeaders, formatApiError } from "../lib/api";
 import { machineImageUrl } from "../lib/machineImages";
+
 
 export default function MyBookingsPage() {
   const {
@@ -32,6 +33,7 @@ export default function MyBookingsPage() {
 
   const [locale, setLocale] = useState<Locale>("pl");
   const [currency, setCurrency] = useState<Currency>("PLN");
+  const [eurRate, setEurRate] = useState(4.25);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,6 +70,15 @@ export default function MyBookingsPage() {
       .catch(() => setBookings([]))
       .finally(() => setLoading(false));
   }, [authUser]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/fx/eur`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.rate) setEurRate(Number(d.rate));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const toLocalIso = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -130,6 +141,8 @@ export default function MyBookingsPage() {
 
   const machineName = (b: Booking) =>
     b.machine_name || machines.find((m) => m.id === b.machine_id)?.name || "Maszyna";
+
+  const money = (n: number) => formatMoney(n, currency, eurRate);
 
   return (
     <div className="min-h-screen bg-[#09090b] text-[#f5f5f7] flex flex-col">
@@ -267,7 +280,7 @@ export default function MyBookingsPage() {
                         {b.delivery_address || "Odbiór z bazy"}
                       </td>
                       <td className="py-4 pr-3 align-middle font-semibold tabular-nums">
-                        {b.total_price_net} zł
+                        {money(b.total_price_net)}
                       </td>
                       <td className="py-4 pr-6 align-middle">
                         <div className="flex flex-col gap-1.5 items-start">

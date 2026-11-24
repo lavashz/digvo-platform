@@ -630,7 +630,7 @@ const fleetMachines = useMemo(
                         </div>
 
                         {nextAction && (
-                            <div className="space-y-3 sticky bottom-4 z-10">
+                            <div className={`space-y-3 ${isNext ? "sticky bottom-4 z-10" : ""}`}>
                             <label className="block text-xs text-zinc-500 uppercase tracking-wide">
                               Odczyt motogodzin
                             </label>
@@ -1098,7 +1098,9 @@ const fleetMachines = useMemo(
                     options={[
                       { value: "Minikoparki", label: "Minikoparki" },
                       { value: "Koparki gąsienicowe", label: "Koparki gąsienicowe" },
+                      { value: "Koparki kołowe", label: "Koparki kołowe" },
                       { value: "Koparkoładowarki", label: "Koparkoładowarki" },
+                      { value: "Ładowarki", label: "Ładowarki" },
                       { value: "Ładowarki kołowe", label: "Ładowarki kołowe" },
                       { value: "Ładowarki teleskopowe", label: "Ładowarki teleskopowe" },
                     ]}
