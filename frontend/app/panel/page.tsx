@@ -999,7 +999,7 @@ const fleetMachines = useMemo(
                 <label className="block">
                   <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Model</span>
                   <input
-                    className={`${INPUT_CLS} rounded-2xl`}
+                    className={`${INPUT_CLS} rounded-full`}
                     placeholder="np. Minikoparka Bobcat E27z"
                     value={newMachineName}
                     onChange={(e) => setNewMachineName(e.target.value)}
@@ -1029,7 +1029,7 @@ const fleetMachines = useMemo(
                     <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Stawka / doba (zł)</span>
                     <input
                       type="number"
-                      className={`${INPUT_CLS} rounded-2xl`}
+                      className={`${INPUT_CLS} rounded-full`}
                       value={newMachineRate}
                       onChange={(e) => setNewMachineRate(e.target.value)}
                       required
@@ -1039,7 +1039,7 @@ const fleetMachines = useMemo(
                     <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Kaucja (zł)</span>
                     <input
                       type="number"
-                      className={`${INPUT_CLS} rounded-2xl`}
+                      className={`${INPUT_CLS} rounded-full`}
                       value={newMachineDeposit}
                       onChange={(e) => setNewMachineDeposit(e.target.value)}
                       required
@@ -1051,7 +1051,7 @@ const fleetMachines = useMemo(
                   <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Bufor serwisowy (h)</span>
                   <input
                     type="number"
-                    className={`${INPUT_CLS} rounded-2xl`}
+                    className={`${INPUT_CLS} rounded-full`}
                     value={newMachineBuffer}
                     onChange={(e) => setNewMachineBuffer(e.target.value)}
                     required
@@ -1087,7 +1087,7 @@ const fleetMachines = useMemo(
                     <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Data</span>
                     <input
                       type="date"
-                      className={`${INPUT_CLS} rounded-2xl`}
+                      className={`${INPUT_CLS} rounded-full`}
                       value={blockDate}
                       onChange={(e) => setBlockDate(e.target.value)}
                       required

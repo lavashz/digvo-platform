@@ -538,7 +538,7 @@ function BookingPage() {
                         type="text"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        className={`${INPUT_CLS} rounded-2xl`}
+                        className={`${INPUT_CLS} rounded-full`}
                         required
                       />
                     </label>
