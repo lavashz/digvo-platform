@@ -440,6 +440,7 @@ def list_machines(db: Session = Depends(get_db)):
             "deposit_amount": float(m.deposit_amount),
             "transport_rate_per_km": float(m.transport_rate_per_km),
             "service_buffer_hours": m.service_buffer_hours,
+            "image_url": m.image_url,
         }
         for m in machines
     ]
@@ -1325,6 +1326,7 @@ def create_machine(
         deposit_amount=payload.deposit_amount,
         transport_rate_per_km=payload.transport_rate_per_km,
         service_buffer_hours=payload.service_buffer_hours,
+        image_url=payload.image_url,
     )
     db.add(machine)
     db.commit()

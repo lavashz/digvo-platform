@@ -48,13 +48,16 @@ export default function PanelPage() {
   const [handoverSigs, setHandoverSigs] = useState<Record<string, string>>({});
 
   const [blockMachineId, setBlockMachineId] = useState("");
-  const [blockDate, setBlockDate] = useState("2027-01-15");
+  const [blockDate, setBlockDate] = useState("");
   const [blockReason, setBlockReason] = useState("MAINTENANCE");
   const [newMachineName, setNewMachineName] = useState("");
   const [newMachineCategory, setNewMachineCategory] = useState("Minikoparki");
   const [newMachineRate, setNewMachineRate] = useState("450");
   const [newMachineDeposit, setNewMachineDeposit] = useState("1000");
   const [newMachineBuffer, setNewMachineBuffer] = useState("2");
+  const [newMachineTransport, setNewMachineTransport] = useState("14");
+  const [newMachinePhoto, setNewMachinePhoto] = useState<string | null>(null);
+  const [newMachinePhotoName, setNewMachinePhotoName] = useState("");
 
   const [loading, setLoading] = useState(false);
   const { flash, show, clear } = useFlash();
@@ -115,6 +118,13 @@ export default function PanelPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser]);
+
+  useEffect(() => {
+    const d = new Date();
+    setBlockDate(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    );
+  }, []);
 
   const machineName = (id: string) => machines.find((m) => m.id === id)?.name || "Maszyna";
 
@@ -237,14 +247,17 @@ export default function PanelPage() {
         category: newMachineCategory,
         daily_rate_net: Number(newMachineRate),
         deposit_amount: Number(newMachineDeposit),
-        transport_rate_per_km: 14,
+        transport_rate_per_km: Number(newMachineTransport),
         service_buffer_hours: Number(newMachineBuffer),
+        image_url: newMachinePhoto,
       }),
     });
     const data = await res.json();
     if (res.ok) {
       show(data.message || "Dodano maszynę.");
       setNewMachineName("");
+      setNewMachinePhoto(null);
+      setNewMachinePhotoName("");
       reload();
     } else {
       show(formatApiError(data.detail, "Błąd dodawania."), "error");
@@ -1057,6 +1070,61 @@ const fleetMachines = useMemo(
                     required
                   />
                 </label>
+                  
+                  <label className="block">
+                    <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Transport zł/km</span>
+                    <input
+                      type="number"
+                      className={`${INPUT_CLS} rounded-full`}
+                      value={newMachineTransport}
+                      onChange={(e) => setNewMachineTransport(e.target.value)}
+                      required
+                    />
+                  </label>
+
+                  <div className="space-y-2">
+                    <span className="block text-[11px] text-zinc-500 px-1">Zdjęcie (opcjonalnie)</span>
+                    {newMachinePhoto ? (
+                      <div className="relative rounded-2xl overflow-hidden border border-white/[0.08] aspect-[16/10] bg-black/40">
+                        <img src={newMachinePhoto} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewMachinePhoto(null);
+                            setNewMachinePhotoName("");
+                          }}
+                          className="absolute top-2 right-2 text-xs bg-black/70 hover:bg-black text-white px-2.5 py-1 rounded-full"
+                        >
+                          Usuń
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-white/15 hover:border-white/30 bg-black/30 px-4 py-8 cursor-pointer transition">
+                        <span className="text-sm text-zinc-300">Wybierz zdjęcie</span>
+                        <span className="text-[11px] text-zinc-500">JPG / PNG, kompresja automatyczna</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = "";
+                            if (!file) return;
+                            try {
+                              const dataUrl = await compressImage(file);
+                              setNewMachinePhoto(dataUrl);
+                              setNewMachinePhotoName(file.name);
+                            } catch {
+                              show("Nie udało się wczytać zdjęcia.", "error");
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                    {newMachinePhotoName && (
+                      <p className="text-[11px] text-zinc-500 truncate px-1">{newMachinePhotoName}</p>
+                    )}
+                  </div>
 
                 <button type="submit" className="w-full bg-white text-black font-semibold rounded-full py-3 text-sm">
                   Dodaj
@@ -1120,10 +1188,27 @@ const fleetMachines = useMemo(
                     blocks.map((bl) => (
                     <li
                       key={bl.id}
-                      className="flex justify-between gap-2 text-xs bg-black/40 rounded-xl px-3 py-2"
+                      className="flex items-start justify-between gap-3 text-xs bg-black/40 rounded-2xl px-3 py-2.5"
                     >
-                      <span>{machineName(bl.machine_id)}</span>
-                      <button type="button" className="text-rose-300" onClick={() => handleDeleteBlock(bl.id)}>
+                      <div className="min-w-0">
+                        <p className="text-zinc-200 truncate">{machineName(bl.machine_id)}</p>
+                        <p className="text-[11px] text-zinc-500 mt-0.5">
+                          {new Date(bl.start_time).toLocaleDateString("pl-PL")}
+                          {" · "}
+                          {bl.reason === "MAINTENANCE"
+                            ? "Serwis / UDT"
+                            : bl.reason === "VACATION"
+                              ? "Postój"
+                              : bl.reason === "SICK_LEAVE"
+                                ? "Awaria"
+                                : bl.reason}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="shrink-0 inline-flex items-center text-xs font-medium border border-rose-500/40 text-rose-300 hover:bg-rose-400 hover:text-black px-2.5 py-1.5 rounded-full transition"
+                        onClick={() => handleDeleteBlock(bl.id)}
+                      >
                         Usuń
                       </button>
                     </li>
@@ -1163,7 +1248,6 @@ const fleetMachines = useMemo(
                 <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
                 <div className="flex flex-wrap gap-x-5 gap-y-1">
                     <span>Platforma demo — praca inżynierska</span>
-                    <span>Zdjęcia: Wikimedia Commons (CC)</span>
                     <Link href="/regulamin" className="hover:text-zinc-400 transition">
                       Regulamin
                     </Link>

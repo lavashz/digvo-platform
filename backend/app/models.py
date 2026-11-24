@@ -3,7 +3,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy import (
-    String, Boolean, Integer, Numeric, Date, DateTime,
+    String, Boolean, Integer, Numeric, Date, DateTime, Text,
     ForeignKey, Enum, func, text
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ExcludeConstraint
@@ -91,6 +91,7 @@ class Machine(Base):
     transport_rate_per_km: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
     service_buffer_hours: Mapped[int] = mapped_column(Integer, default=4)
     udt_valid_until: Mapped[date | None] = mapped_column(Date)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     organization: Mapped["Organization"] = relationship(back_populates="machines")
     required_qualification: Mapped["Qualification"] = relationship()

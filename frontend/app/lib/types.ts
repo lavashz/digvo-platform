@@ -10,6 +10,7 @@ export interface Machine {
   deposit_amount: number;
   transport_rate_per_km: number;
   service_buffer_hours: number;
+  image_url?: string | null;
 }
 
 export interface BookingQuote {

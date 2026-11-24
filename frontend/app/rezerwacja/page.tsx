@@ -730,7 +730,6 @@ function BookingPage() {
                 <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
                 <div className="flex flex-wrap gap-x-5 gap-y-1">
                     <span>Platforma demo — praca inżynierska</span>
-                    <span>Zdjęcia: Wikimedia Commons (CC)</span>
                     <Link href="/regulamin" className="hover:text-zinc-400 transition">
                       Regulamin
                     </Link>

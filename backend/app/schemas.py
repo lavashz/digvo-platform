@@ -123,6 +123,7 @@ class MachineCreate(BaseModel):
     deposit_amount: Decimal
     transport_rate_per_km: Decimal = Decimal("14.00")
     service_buffer_hours: int = 2
+    image_url: str | None = Field(default=None, max_length=900_000)
     
 
 class RegisterRequest(BaseModel):

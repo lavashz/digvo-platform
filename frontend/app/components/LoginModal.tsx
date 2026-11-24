@@ -233,7 +233,7 @@ export default function LoginModal({
                     }}
                     placeholder="Imię i nazwisko / nazwa firmy"
                     required
-                    className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
+                    className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-full px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
                   />
                 </label>
                 <label className="block">
@@ -248,7 +248,7 @@ export default function LoginModal({
                     }}
                     placeholder="Telefon (+48 …)"
                     required
-                    className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
+                    className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-full px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
                   />
                 </label>
 
@@ -275,7 +275,7 @@ export default function LoginModal({
                         if (error) onClearError();
                       }}
                       placeholder="NIP firmy (opcjonalnie)"
-                      className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
+                      className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-full px-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
                     />
                     <button
                       type="button"
@@ -302,7 +302,7 @@ export default function LoginModal({
                         }
                         setNipBusy(false);
                       }}
-                      className="shrink-0 px-3 rounded-2xl bg-white/[0.08] hover:bg-white/[0.14] disabled:opacity-40 text-xs font-medium text-white"
+                      className="shrink-0 px-3 rounded-full bg-white/[0.08] hover:bg-white/[0.14] disabled:opacity-40 text-xs font-medium text-white"
                     >
                       {nipBusy ? "…" : "Sprawdź"}
                     </button>
@@ -331,7 +331,7 @@ export default function LoginModal({
                   }}
                   placeholder="E-mail firmowy"
                   required
-                  className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl pl-11 pr-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
+                  className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-full pl-11 pr-4 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
                 />
               </div>
             </label>
@@ -351,7 +351,7 @@ export default function LoginModal({
                   placeholder={mode === "login" ? "Hasło" : "Hasło (min. 6 znaków)"}
                   required
                   minLength={mode === "register" ? 6 : undefined}
-                  className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-2xl pl-11 pr-12 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
+                  className="w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 rounded-full pl-11 pr-12 py-3.5 text-[15px] text-white placeholder:text-zinc-500 outline-none transition"
                 />
                 <button
                   type="button"
