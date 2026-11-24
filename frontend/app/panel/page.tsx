@@ -14,6 +14,7 @@ import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
 import FleetGantt from "../components/FleetGantt";
 import SoftSelect from "../components/SoftSelect";
+import { machineImageUrl } from "../lib/machineImages";
 
 export default function PanelPage() {
   const {
@@ -58,6 +59,8 @@ export default function PanelPage() {
   const [newMachineTransport, setNewMachineTransport] = useState("14");
   const [newMachinePhoto, setNewMachinePhoto] = useState<string | null>(null);
   const [newMachinePhotoName, setNewMachinePhotoName] = useState("");
+  const [editingMachineId, setEditingMachineId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Machine | null>(null);
 
   const [loading, setLoading] = useState(false);
   const { flash, show, clear } = useFlash();
@@ -84,7 +87,7 @@ export default function PanelPage() {
     try {
       const headers = authHeaders(authUser.token);
       const [mRes, bRes, blRes] = await Promise.all([
-        fetch(`${API_URL}/machines`),
+        fetch(`${API_URL}/machines/fleet`, { headers }),
         fetch(`${API_URL}/bookings`, { headers }),
         fetch(`${API_URL}/blocks`, { headers }),
       ]);
@@ -236,33 +239,96 @@ export default function PanelPage() {
     return false;
   };
 
-  const handleCreateMachine = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!authUser) return;
-    const res = await fetch(`${API_URL}/machines`, {
-      method: "POST",
-      headers: authHeaders(authUser.token),
-      body: JSON.stringify({
-        name: newMachineName,
-        category: newMachineCategory,
-        daily_rate_net: Number(newMachineRate),
-        deposit_amount: Number(newMachineDeposit),
-        transport_rate_per_km: Number(newMachineTransport),
-        service_buffer_hours: Number(newMachineBuffer),
-        image_url: newMachinePhoto,
-      }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      show(data.message || "Dodano maszynę.");
-      setNewMachineName("");
-      setNewMachinePhoto(null);
-      setNewMachinePhotoName("");
-      reload();
-    } else {
-      show(formatApiError(data.detail, "Błąd dodawania."), "error");
-    }
+  const resetMachineForm = () => {
+  setEditingMachineId(null);
+  setNewMachineName("");
+  setNewMachineCategory("Minikoparki");
+  setNewMachineRate("450");
+  setNewMachineDeposit("1000");
+  setNewMachineBuffer("2");
+  setNewMachineTransport("14");
+  setNewMachinePhoto(null);
+  setNewMachinePhotoName("");
+};
+
+const startEditMachine = (m: Machine) => {
+  setEditingMachineId(m.id);
+  setNewMachineName(m.name);
+  setNewMachineCategory(m.category);
+  setNewMachineRate(String(m.daily_rate_net));
+  setNewMachineDeposit(String(m.deposit_amount));
+  setNewMachineBuffer(String(m.service_buffer_hours));
+  setNewMachineTransport(String(m.transport_rate_per_km));
+  setNewMachinePhoto(m.image_url || null);
+  setNewMachinePhotoName(m.image_url ? "obecne zdjęcie" : "");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+const handleSaveMachine = async (e: FormEvent) => {
+  e.preventDefault();
+  if (!authUser) return;
+  const body = {
+    name: newMachineName,
+    category: newMachineCategory,
+    daily_rate_net: Number(newMachineRate),
+    deposit_amount: Number(newMachineDeposit),
+    transport_rate_per_km: Number(newMachineTransport),
+    service_buffer_hours: Number(newMachineBuffer),
+    image_url: newMachinePhoto,
+    ...(editingMachineId
+  ? {}
+  : { is_published: true }),
   };
+  const url = editingMachineId
+    ? `${API_URL}/machines/${editingMachineId}`
+    : `${API_URL}/machines`;
+  const res = await fetch(url, {
+    method: editingMachineId ? "PATCH" : "POST",
+    headers: authHeaders(authUser.token),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    show(data.message || (editingMachineId ? "Zapisano." : "Dodano maszynę."));
+    resetMachineForm();
+    reload();
+  } else {
+    show(formatApiError(data.detail, "Błąd zapisu maszyny."), "error");
+  }
+};
+
+const togglePublishMachine = async (m: Machine) => {
+  if (!authUser) return;
+  const res = await fetch(`${API_URL}/machines/${m.id}`, {
+    method: "PATCH",
+    headers: authHeaders(authUser.token),
+    body: JSON.stringify({ is_published: !(m.is_published !== false) }),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    show(m.is_published === false ? "Opublikowano w katalogu." : "Wycofano z katalogu.");
+    reload();
+  } else {
+    show(formatApiError(data.detail, "Błąd publikacji."), "error");
+  }
+};
+
+const handleDeleteMachine = async (m: Machine) => {
+  if (!authUser) return;
+  const res = await fetch(`${API_URL}/machines/${m.id}`, {
+    method: "DELETE",
+    headers: authHeaders(authUser.token),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.ok) {
+    show(data.message || "Usunięto maszynę.");
+    if (editingMachineId === m.id) resetMachineForm();
+    setDeleteTarget(null);
+    reload();
+  } else {
+    show(formatApiError(data.detail, "Nie udało się usunąć."), "error");
+  }
+};
 
   const handleCreateBlock = async (e: FormEvent) => {
     e.preventDefault();
@@ -1004,10 +1070,12 @@ const fleetMachines = useMemo(
             <>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <form
-                onSubmit={handleCreateMachine}
+                onSubmit={handleSaveMachine}
                 className="rounded-3xl border border-white/[0.06] bg-[#111113] p-6 space-y-3"
               >
-                <h3 className="font-semibold text-white">Dodaj maszynę</h3>
+                <h3 className="font-semibold text-white">
+                  {editingMachineId ? "Edytuj maszynę" : "Dodaj maszynę"}
+                </h3>
 
                 <label className="block">
                   <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">Model</span>
@@ -1126,9 +1194,23 @@ const fleetMachines = useMemo(
                     )}
                   </div>
 
-                <button type="submit" className="w-full bg-white text-black font-semibold rounded-full py-3 text-sm">
-                  Dodaj
-                </button>
+                <div className="flex gap-2">
+                  {editingMachineId && (
+                    <button
+                      type="button"
+                      onClick={resetMachineForm}
+                      className="flex-1 border border-white/15 text-zinc-300 font-medium rounded-full py-3 text-sm"
+                    >
+                      Anuluj
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="flex-[2] bg-white text-black font-semibold rounded-full py-3 text-sm"
+                  >
+                    {editingMachineId ? "Zapisz zmiany" : "Dodaj"}
+                  </button>
+                </div>
               </form>
 
               <form
@@ -1217,6 +1299,85 @@ const fleetMachines = useMemo(
                 </ul>
               </form>
               </div>
+
+                  <div className="mt-6 rounded-3xl border border-white/[0.06] bg-[#111113] p-6">
+                    <div className="flex items-baseline justify-between gap-3 mb-4">
+                      <h3 className="font-semibold text-white">Maszyny we flocie</h3>
+                      <p className="text-[11px] text-zinc-500">
+                        {fleetMachines.filter((m) => m.is_published !== false).length}/{fleetMachines.length} w katalogu
+                      </p>
+                    </div>
+                    {fleetMachines.length === 0 ? (
+                      <p className="text-sm text-zinc-500 py-6 text-center">Brak maszyn — dodaj po lewej.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {fleetMachines.map((m) => {
+                          const published = m.is_published !== false;
+                          const hasHistory =
+                            bookings.some((b) => b.machine_id === m.id) ||
+                            blocks.some((bl) => bl.machine_id === m.id);
+                          return (
+                            <li
+                              key={m.id}
+                              className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl bg-black/40 border border-white/[0.06] p-3"
+                            >
+                              <div className="w-full sm:w-24 h-16 rounded-xl overflow-hidden bg-[#1a1a1c] shrink-0">
+                                <img
+                                  src={machineImageUrl(m)}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm text-white font-medium truncate">{m.name}</p>
+                                <p className="text-[11px] text-zinc-500 mt-0.5">
+                                  {m.category} · {m.daily_rate_net} zł/doba
+                                  {" · "}
+                                  <span className={published ? "text-emerald-400" : "text-amber-400"}>
+                                    {published ? "w katalogu" : "ukryta"}
+                                  </span>
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5 sm:justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => startEditMachine(m)}
+                                  className="inline-flex items-center text-xs font-medium border border-white/20 text-zinc-200 hover:bg-white hover:text-black px-2.5 py-1.5 rounded-full transition"
+                                >
+                                  Edytuj
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => togglePublishMachine(m)}
+                                  className={`inline-flex items-center text-xs font-medium border px-2.5 py-1.5 rounded-full transition ${
+                                    published
+                                      ? "border-amber-500/40 text-amber-300 hover:bg-amber-400 hover:text-black"
+                                      : "border-emerald-500/40 text-emerald-300 hover:bg-emerald-400 hover:text-black"
+                                  }`}
+                                >
+                                  {published ? "Ukryj" : "Publikuj"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={hasHistory}
+                                  title={
+                                    hasHistory
+                                      ? "Ma zlecenia lub blokady — najpierw ukryj w katalogu (nie da się usunąć z historią)."
+                                      : "Usuń trwale z floty"
+                                  }
+                                  onClick={() => setDeleteTarget(m)}
+                                  className="inline-flex items-center text-xs font-medium border border-rose-500/40 text-rose-300 hover:bg-rose-400 hover:text-black px-2.5 py-1.5 rounded-full transition disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-rose-300 disabled:cursor-not-allowed"
+                                >
+                                  Usuń
+                                </button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+
               </>
               )}
             </>
@@ -1259,6 +1420,43 @@ const fleetMachines = useMemo(
             </div>
         </footer>
         <Toast flash={flash} onClose={clear} />
+
+          {deleteTarget && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-5">
+              <button
+                type="button"
+                aria-label="Zamknij"
+                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                onClick={() => setDeleteTarget(null)}
+              />
+              <div className="relative w-full max-w-sm rounded-3xl border border-white/[0.1] bg-[#121214] p-6 shadow-2xl shadow-black/60">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Usuwanie z floty</p>
+                <h3 className="mt-2 text-lg font-semibold text-white leading-snug">
+                  Usunąć „{deleteTarget.name}”?
+                </h3>
+                <p className="mt-2 text-sm text-zinc-400">
+                  Maszyna zniknie z floty. Jeśli ma historię rezerwacji, lepiej najpierw ją ukryć w katalogu.
+                </p>
+                <div className="mt-5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(null)}
+                    className="flex-1 border border-white/15 text-zinc-300 font-medium rounded-full py-3 text-sm hover:bg-white/[0.06] transition"
+                  >
+                    Anuluj
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMachine(deleteTarget)}
+                    className="flex-[1.2] bg-rose-500 hover:bg-rose-400 text-white font-semibold rounded-full py-3 text-sm transition"
+                  >
+                    Usuń
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}  
+
       <LoginModal
         open={showLogin}
         onClose={closeLogin}

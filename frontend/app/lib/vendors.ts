@@ -118,7 +118,7 @@ export function paymentMeta(status?: string) {
     case "AWAITING_TRANSFER":
     default:
       return {
-        label: "Oczekuje na przelew",
+        label: "Do przelewu",
         cls: "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20",
       };
   }

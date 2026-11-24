@@ -12,6 +12,7 @@ import { t, type Locale, type Currency } from "../lib/i18n";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
 import { API_URL, authHeaders, formatApiError } from "../lib/api";
+import { machineImageUrl } from "../lib/machineImages";
 
 export default function MyBookingsPage() {
   const {
@@ -127,7 +128,8 @@ export default function MyBookingsPage() {
     reloadMine();
   };
 
-  const machineName = (id: string) => machines.find((m) => m.id === id)?.name || "Maszyna";
+  const machineName = (b: Booking) =>
+    b.machine_name || machines.find((m) => m.id === b.machine_id)?.name || "Maszyna";
 
   return (
     <div className="min-h-screen bg-[#09090b] text-[#f5f5f7] flex flex-col">
@@ -208,14 +210,33 @@ export default function MyBookingsPage() {
                 {bookings.map((b) => {
                   const st = statusMeta(b.status);
                   const m = machines.find((x) => x.id === b.machine_id);
-                  const v = m ? resolveMachineVendor(m) : null;
                   return (
                     <tr key={b.id} className="hover:bg-white/[0.02]">
                       <td className="py-4 pl-3 pr-3 align-middle">
-                        <p className="text-white text-sm font-medium">{machineName(b.machine_id)}</p>
-                        {v && (
-                          <p className="text-[11px] text-zinc-500 mt-0.5">{v.shortName}</p>
-                        )}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#1a1a1c] shrink-0 border border-white/[0.06]">
+                            <img
+                              src={
+                                b.image_url ||
+                                (m ? machineImageUrl(m) : machineImageUrl({
+                                  name: b.machine_name || "",
+                                  category: b.machine_category || "",
+                                  image_url: b.image_url,
+                                }))
+                              }
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-white text-sm font-medium truncate">{machineName(b)}</p>
+                            <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
+                              {b.organization_name ||
+                                (m ? resolveMachineVendor(m).shortName : null) ||
+                                "—"}
+                            </p>
+                          </div>
+                        </div>
                       </td>
                       <td className="py-4 pr-3 align-middle text-xs text-zinc-300">
                         <div>
@@ -253,7 +274,7 @@ export default function MyBookingsPage() {
                           <span className={`px-2.5 py-1 rounded-full text-[11px] ${st.cls}`}>
                             {st.label}
                           </span>
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] ${paymentMeta(b.payment_status).cls}`}>
+                          <span className={`inline-flex w-fit px-2.5 py-1 rounded-full text-[11px] ${paymentMeta(b.payment_status).cls}`}>
                             {paymentMeta(b.payment_status).label}
                           </span>
                         </div>

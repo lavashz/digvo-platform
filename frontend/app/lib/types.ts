@@ -11,6 +11,7 @@ export interface Machine {
   transport_rate_per_km: number;
   service_buffer_hours: number;
   image_url?: string | null;
+  is_published?: boolean;
 }
 
 export interface BookingQuote {
@@ -61,6 +62,10 @@ export interface Booking {
   deposit_paid?: number;
   deposit_required?: number;
   protocols: Protocol[];
+  machine_name?: string | null;
+  machine_category?: string | null;
+  organization_name?: string | null;
+  image_url?: string | null;
 }
 
 export interface UnavailabilityBlock {

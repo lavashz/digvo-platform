@@ -19,7 +19,7 @@ from app.models import (
 from app.schemas import (
     BookingCreate, BookingResponse, BookingQuoteResponse, BookingStatusUpdate,
     BookingScheduleUpdate, BookingPaymentUpdate,
-    HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse, RegisterRequest,
+    HandoverCreate, BlockCreate, LoginRequest, MachineCreate, MachineUpdate, TokenResponse, RegisterRequest,
     NipLookupResponse, VendorRegisterRequest,
     WARSAW,
 )
@@ -425,7 +425,9 @@ def register_vendor(payload: VendorRegisterRequest, db: Session = Depends(get_db
 @app.get("/machines")
 def list_machines(db: Session = Depends(get_db)):
     machines = db.execute(
-        select(Machine).options(joinedload(Machine.organization))
+        select(Machine)
+        .options(joinedload(Machine.organization))
+        .where(Machine.is_published.is_(True))
     ).scalars().unique().all()
     return [
         {
@@ -441,6 +443,39 @@ def list_machines(db: Session = Depends(get_db)):
             "transport_rate_per_km": float(m.transport_rate_per_km),
             "service_buffer_hours": m.service_buffer_hours,
             "image_url": m.image_url,
+            "is_published": bool(m.is_published),
+        }
+        for m in machines
+    ]
+    
+@app.get("/machines/fleet")
+def list_fleet_machines(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in (UserRole.DISPATCHER, UserRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Tylko dyspozytor widzi flotę.")
+    q = select(Machine).options(joinedload(Machine.organization)).order_by(Machine.name.asc())
+    if current_user.role != UserRole.ADMIN:
+        if not current_user.organization_id:
+            return []
+        q = q.where(Machine.organization_id == current_user.organization_id)
+    machines = db.execute(q).scalars().unique().all()
+    return [
+        {
+            "id": str(m.id),
+            "organization_id": str(m.organization_id),
+            "organization_name": m.organization.name if m.organization else None,
+            "base_lat": float(m.organization.base_lat) if m.organization and m.organization.base_lat is not None else None,
+            "base_lng": float(m.organization.base_lng) if m.organization and m.organization.base_lng is not None else None,
+            "name": m.name,
+            "category": m.category,
+            "daily_rate_net": float(m.daily_rate_net),
+            "deposit_amount": float(m.deposit_amount),
+            "transport_rate_per_km": float(m.transport_rate_per_km),
+            "service_buffer_hours": m.service_buffer_hours,
+            "image_url": m.image_url,
+            "is_published": bool(m.is_published),
         }
         for m in machines
     ]
@@ -828,6 +863,14 @@ def list_bookings(
             "id": str(b.id),
             "client_id": str(b.client_id),
             "machine_id": str(b.machine_id),
+            "machine_name": machine.name if machine else None,
+            "machine_category": machine.category if machine else None,
+            "organization_name": (
+                machine.organization.name
+                if machine and getattr(machine, "organization", None)
+                else None
+            ),
+            "image_url": machine.image_url if machine else None,
             "operator_id": str(b.operator_id) if b.operator_id else None,
             "operator_name": users_map.get(b.operator_id) if b.operator_id else None,
             "start_time": b.start_time,
@@ -1276,10 +1319,20 @@ def list_my_bookings(
             select(HandoverProtocol).where(HandoverProtocol.booking_id == b.id)
         ).scalars().all()
         machine = db.get(Machine, b.machine_id)
+        if machine and machine.organization_id and not machine.organization:
+            _ = machine.organization  # touch relationship
         result.append({
             "id": str(b.id),
             "client_id": str(b.client_id),
             "machine_id": str(b.machine_id),
+            "machine_name": machine.name if machine else None,
+            "machine_category": machine.category if machine else None,
+            "organization_name": (
+                machine.organization.name
+                if machine and getattr(machine, "organization", None)
+                else None
+            ),
+            "image_url": machine.image_url if machine else None,
             "operator_id": str(b.operator_id) if b.operator_id else None,
             "operator_name": users_map.get(b.operator_id) if b.operator_id else None,
             "start_time": b.start_time,
@@ -1327,6 +1380,7 @@ def create_machine(
         transport_rate_per_km=payload.transport_rate_per_km,
         service_buffer_hours=payload.service_buffer_hours,
         image_url=payload.image_url,
+        is_published=payload.is_published if hasattr(payload, "is_published") else True,
     )
     db.add(machine)
     db.commit()
@@ -1336,3 +1390,49 @@ def create_machine(
         "name": machine.name,
         "message": f"Dodano maszynę {machine.name} do katalogu floty."
     }
+    
+@app.patch("/machines/{machine_id}")
+def update_machine(
+    machine_id: str,
+    payload: MachineUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in (UserRole.DISPATCHER, UserRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Brak uprawnień.")
+    machine = db.get(Machine, machine_id)
+    if not machine:
+        raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
+    if current_user.role != UserRole.ADMIN and machine.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="To nie jest maszyna Twojej floty.")
+    data = payload.model_dump(exclude_unset=True)
+    for key, value in data.items():
+        setattr(machine, key, value)
+    db.commit()
+    db.refresh(machine)
+    return {"id": str(machine.id), "message": f"Zaktualizowano: {machine.name}."}
+
+
+@app.delete("/machines/{machine_id}")
+def delete_machine(
+    machine_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in (UserRole.DISPATCHER, UserRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Brak uprawnień.")
+    machine = db.get(Machine, machine_id)
+    if not machine:
+        raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
+    if current_user.role != UserRole.ADMIN and machine.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="To nie jest maszyna Twojej floty.")
+    try:
+        db.delete(machine)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Nie można usunąć — maszyna ma historię rezerwacji/blokad. Najpierw wycofaj z katalogu (odpublikuj).",
+        )
+    return {"message": f"Usunięto maszynę {machine.name}."}

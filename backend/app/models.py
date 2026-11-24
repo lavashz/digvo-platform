@@ -92,6 +92,7 @@ class Machine(Base):
     service_buffer_hours: Mapped[int] = mapped_column(Integer, default=4)
     udt_valid_until: Mapped[date | None] = mapped_column(Date)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     organization: Mapped["Organization"] = relationship(back_populates="machines")
     required_qualification: Mapped["Qualification"] = relationship()
