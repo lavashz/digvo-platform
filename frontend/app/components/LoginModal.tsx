@@ -167,18 +167,18 @@ export default function LoginModal({
         className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in cursor-default"
       />
 
-      <div className="relative w-full sm:max-w-[26rem] max-h-[92vh] overflow-y-auto scroll-thin glass-strong border border-white/[0.1] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl shadow-black/80 animate-pop-in">
-        <div className="hazard h-1.5 w-full rounded-t-[2rem]" />
+      <div className="relative w-full sm:max-w-[26rem] max-h-[92vh] flex flex-col overflow-hidden glass-strong border border-white/[0.1] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl shadow-black/80 animate-pop-in">
+        <div className="hazard h-1.5 w-full shrink-0 rounded-t-[2rem]" />
 
         <button
           onClick={onClose}
           aria-label="Zamknij"
-          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/[0.07] hover:bg-white/[0.14] text-zinc-300 flex items-center justify-center transition press"
+          className="absolute top-5 right-5 z-10 w-8 h-8 rounded-full bg-white/[0.07] hover:bg-white/[0.14] text-zinc-300 flex items-center justify-center transition press"
         >
           <XIcon className="w-4 h-4" />
         </button>
 
-        <div className="px-7 sm:px-8 pt-8 pb-8">
+        <div className="px-7 sm:px-8 pt-8 pb-8 overflow-y-auto scroll-thin min-h-0 flex-1">
           <div className="w-12 h-12 rounded-2xl bg-white text-black font-bold text-xl tracking-tighter flex items-center justify-center shadow-lg shadow-brand/10">
             D
           </div>

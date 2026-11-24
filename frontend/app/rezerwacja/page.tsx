@@ -133,6 +133,9 @@ function BookingPage() {
     setMaxStep((m) => (n > m ? n : m));
   };
 
+  const invalidSameDayHours =
+    !!startDate && !!endDate && startDate === endDate && endHour <= startHour;
+
   useEffect(() => {
     const savedLocale = localStorage.getItem("digvo_locale");
     const savedCurrency = localStorage.getItem("digvo_currency");
@@ -478,11 +481,16 @@ function BookingPage() {
                         <button
                           type="button"
                           onClick={() => goStep(2)}
-                          disabled={!startDate || !endDate || endDate < startDate}
+                          disabled={!startDate || !endDate || endDate < startDate || invalidSameDayHours}
                           className="w-full bg-brand text-black font-semibold py-3.5 rounded-full disabled:opacity-50"
                         >
                           Dalej — opcje →
                         </button>
+                        {invalidSameDayHours && (
+                          <p className="text-xs text-amber-400 text-center">
+                            Godzina zakończenia musi być późniejsza niż start.
+                          </p>
+                        )}
                         </div>
                         )}
 

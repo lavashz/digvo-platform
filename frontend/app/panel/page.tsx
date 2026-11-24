@@ -129,6 +129,20 @@ export default function PanelPage() {
     );
   }, []);
 
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDeleteTarget(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [deleteTarget]);
+
   const machineName = (id: string) => machines.find((m) => m.id === id)?.name || "Maszyna";
 
   const filteredBookings = useMemo(() => {
