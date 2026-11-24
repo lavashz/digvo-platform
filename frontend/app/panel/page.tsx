@@ -7,7 +7,7 @@ import SiteHeader from "../components/SiteHeader";
 import { PinIcon } from "../components/Icons";
 import { useAuth } from "../lib/auth";
 import { API_URL, authHeaders, formatApiError } from "../lib/api";
-import { DEMO_ACCOUNTS, INPUT_CLS, statusMeta } from "../lib/vendors";
+import { DEMO_ACCOUNTS, INPUT_CLS, statusMeta, paymentMeta } from "../lib/vendors";
 import type { Booking, Machine, UnavailabilityBlock } from "../lib/types";
 import { t, type Locale, type Currency } from "../lib/i18n";
 import Toast from "../components/Toast";
@@ -181,6 +181,22 @@ export default function PanelPage() {
     } else {
       show(formatApiError(data.detail, "Błąd statusu."), "error");
     }
+  };
+
+  const setPayment = async (bookingId: string, payment_status: string) => {
+    if (!authUser) return;
+    const res = await fetch(`${API_URL}/bookings/${bookingId}/payment`, {
+      method: "PATCH",
+      headers: authHeaders(authUser.token),
+      body: JSON.stringify({ payment_status }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      show(formatApiError(data.detail, "Błąd płatności."), "error");
+      return;
+    }
+    show("Zaktualizowano status kaucji.", "success");
+    await reload();
   };
 
   const handleSchedule = async (args: {
@@ -898,9 +914,14 @@ const fleetMachines = useMemo(
                             </td>
                             <td className="py-3 pr-2 tabular-nums">{b.total_price_net} zł</td>
                             <td className="py-3 pr-2">
-                              <span className={`text-[11px] px-2 py-1 rounded-full ${st.cls}`}>
-                                {st.label}
-                              </span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className={`text-[11px] px-2 py-1 rounded-full ${st.cls}`}>
+                                  {st.label}
+                                </span>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${paymentMeta(b.payment_status).cls}`}>
+                                  {paymentMeta(b.payment_status).label}
+                                </span>
+                              </div>
                             </td>
                             <td
                               className="py-3 text-right space-x-1"
@@ -914,6 +935,16 @@ const fleetMachines = useMemo(
                               >
                                 PDF
                               </a>
+
+                              {b.payment_status !== "DEPOSIT_CONFIRMED" && b.status !== "CANCELLED" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPayment(b.id, "DEPOSIT_CONFIRMED")}
+                                  className="text-xs text-emerald-400 px-2 py-1"
+                                >
+                                  Potwierdź kaucję
+                                </button>
+                              )}
                               {b.status === "CONFIRMED" && (
                                 <button
                                   type="button"

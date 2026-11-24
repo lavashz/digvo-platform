@@ -6,7 +6,7 @@ import LoginModal from "../components/LoginModal";
 import SiteHeader from "../components/SiteHeader";
 import { FileIcon } from "../components/Icons";
 import { useAuth } from "../lib/auth";
-import { DEMO_ACCOUNTS, resolveMachineVendor, statusMeta } from "../lib/vendors";
+import { DEMO_ACCOUNTS, resolveMachineVendor, statusMeta, paymentMeta } from "../lib/vendors";
 import type { Booking, Machine } from "../lib/types";
 import { t, type Locale, type Currency } from "../lib/i18n";
 import Toast from "../components/Toast";
@@ -109,6 +109,22 @@ export default function MyBookingsPage() {
     } else {
       show(formatApiError(data.detail, "Nie udało się przedłużyć."), "error");
     }
+  };
+
+  const reportTransfer = async (bookingId: string) => {
+    if (!authUser) return;
+    const res = await fetch(`${API_URL}/bookings/${bookingId}/payment`, {
+      method: "PATCH",
+      headers: authHeaders(authUser.token),
+      body: JSON.stringify({ payment_status: "TRANSFER_REPORTED" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      show(formatApiError(data.detail, "Nie udało się zgłosić przelewu."), "error");
+      return;
+    }
+    show("Zgłoszono przelew kaucji.", "success");
+    reloadMine();
   };
 
   const machineName = (id: string) => machines.find((m) => m.id === id)?.name || "Maszyna";
@@ -223,11 +239,26 @@ export default function MyBookingsPage() {
                       </td>
                       <td className="py-4 pr-3 font-semibold tabular-nums">{b.total_price_net} zł</td>
                       <td className="py-4 pr-3">
-                        <span className={`px-2.5 py-1 rounded-full text-[11px] ${st.cls}`}>
-                          {st.label}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] ${st.cls}`}>
+                            {st.label}
+                          </span>
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] ${paymentMeta(b.payment_status).cls}`}>
+                            {paymentMeta(b.payment_status).label}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-4 text-right space-x-1 whitespace-nowrap">
+                        {(!b.payment_status || b.payment_status === "AWAITING_TRANSFER") &&
+                          b.status !== "CANCELLED" && (
+                          <button
+                            type="button"
+                            onClick={() => reportTransfer(b.id)}
+                            className="inline-flex items-center text-xs border border-white/20 text-zinc-200 hover:bg-white hover:text-black px-3 py-1.5 rounded-full transition"
+                          >
+                            Zgłosiłem przelew
+                          </button>
+                        )}
                         {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
                           <button
                             type="button"

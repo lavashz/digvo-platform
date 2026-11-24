@@ -13,12 +13,12 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import SessionLocal
 from app.models import (
     User, UserRole, Machine, OperatorProfile, TransportVehicle,
-    OperatorQualification, Booking, BookingStatus,
-    UnavailabilityBlock, HandoverProtocol, Qualification, Organization,
+    OperatorQualification, Booking, BookingStatus, PaymentStatus,
+    UnavailabilityBlock, HandoverProtocol, Qualification, Organization
 )
 from app.schemas import (
     BookingCreate, BookingResponse, BookingQuoteResponse, BookingStatusUpdate,
-    BookingScheduleUpdate,
+    BookingScheduleUpdate, BookingPaymentUpdate,
     HandoverCreate, BlockCreate, LoginRequest, MachineCreate, TokenResponse, RegisterRequest,
     NipLookupResponse, VendorRegisterRequest,
     WARSAW,
@@ -52,6 +52,20 @@ def _assert_machine_scope(user: User, machine: Machine) -> None:
             status_code=403,
             detail="Brak dostępu do zasobów tej wypożyczalni.",
         )
+        
+        
+def _payment_fields(booking: Booking, machine: Machine | None = None) -> dict:
+    deposit_required = float(machine.deposit_amount) if machine else 0.0
+    status = (
+        booking.payment_status.value
+        if getattr(booking, "payment_status", None)
+        else PaymentStatus.AWAITING_TRANSFER.value
+    )
+    return {
+        "payment_status": status,
+        "deposit_paid": float(booking.deposit_paid or 0),
+        "deposit_required": deposit_required,
+    }
         
 
 app = FastAPI(
@@ -732,7 +746,8 @@ def create_booking(
         total_price_net=total_price,
         deposit_paid=Decimal("0.00"),
         has_damage_waiver=payload.has_damage_waiver,
-        status=BookingStatus.CONFIRMED
+        status=BookingStatus.CONFIRMED,
+        payment_status=PaymentStatus.AWAITING_TRANSFER,
     )
 
     try:
@@ -807,6 +822,7 @@ def list_bookings(
         protocols = db.execute(
             select(HandoverProtocol).where(HandoverProtocol.booking_id == b.id)
         ).scalars().all()
+        machine = db.get(Machine, b.machine_id)
         result.append({
             "id": str(b.id),
             "client_id": str(b.client_id),
@@ -818,6 +834,7 @@ def list_bookings(
             "delivery_address": b.delivery_address,
             "total_price_net": float(b.total_price_net),
             "status": b.status.value,
+            **_payment_fields(b, machine),
             "protocols": [
                 {
                     "protocol_type": p.protocol_type,
@@ -852,6 +869,61 @@ def update_booking_status(
     db.refresh(booking)
     
     return {"id": str(booking.id), "status": booking.status.value}
+
+@app.patch("/bookings/{booking_id}/payment")
+def update_booking_payment(
+    booking_id: UUID,
+    payload: BookingPaymentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    booking = db.get(Booking, booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Nie znaleziono rezerwacji.")
+
+    machine = db.get(Machine, booking.machine_id)
+    if not machine:
+        raise HTTPException(status_code=404, detail="Nie znaleziono maszyny.")
+
+    try:
+        new_status = PaymentStatus(payload.payment_status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Nieprawidłowy status płatności.")
+
+    is_client = (
+        current_user.role == UserRole.CLIENT
+        and booking.client_id == current_user.id
+    )
+    is_staff = current_user.role in (UserRole.DISPATCHER, UserRole.ADMIN)
+
+    if is_client:
+        if new_status != PaymentStatus.TRANSFER_REPORTED:
+            raise HTTPException(
+                status_code=403,
+                detail="Klient może tylko zgłosić przelew kaucji.",
+            )
+        if booking.payment_status not in (
+            PaymentStatus.AWAITING_TRANSFER,
+            PaymentStatus.TRANSFER_REPORTED,
+        ):
+            raise HTTPException(status_code=409, detail="Kaucja jest już potwierdzona.")
+        booking.payment_status = PaymentStatus.TRANSFER_REPORTED
+    elif is_staff:
+        _assert_machine_scope(current_user, machine)
+        booking.payment_status = new_status
+        if new_status == PaymentStatus.DEPOSIT_CONFIRMED:
+            booking.deposit_paid = machine.deposit_amount
+        elif new_status == PaymentStatus.AWAITING_TRANSFER:
+            booking.deposit_paid = Decimal("0.00")
+    else:
+        raise HTTPException(status_code=403, detail="Brak uprawnień do płatności.")
+
+    db.commit()
+    db.refresh(booking)
+    return {
+        "id": str(booking.id),
+        **_payment_fields(booking, machine),
+    }
 
 @app.patch("/bookings/{booking_id}/schedule")
 def update_booking_schedule(
@@ -1202,6 +1274,7 @@ def list_my_bookings(
         protocols = db.execute(
             select(HandoverProtocol).where(HandoverProtocol.booking_id == b.id)
         ).scalars().all()
+        machine = db.get(Machine, b.machine_id)
         result.append({
             "id": str(b.id),
             "client_id": str(b.client_id),
@@ -1213,6 +1286,7 @@ def list_my_bookings(
             "delivery_address": b.delivery_address,
             "total_price_net": float(b.total_price_net),
             "status": b.status.value,
+            **_payment_fields(b, machine),
             "protocols": [
                 {
                     "protocol_type": p.protocol_type,

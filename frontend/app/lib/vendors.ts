@@ -103,5 +103,26 @@ export function statusMeta(status: string) {
   }
 }
 
+export function paymentMeta(status?: string) {
+  switch (status) {
+    case "TRANSFER_REPORTED":
+      return {
+        label: "Przelew zgłoszony",
+        cls: "bg-amber-500/10 text-amber-300 border border-amber-500/20",
+      };
+    case "DEPOSIT_CONFIRMED":
+      return {
+        label: "Kaucja opłacona",
+        cls: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+      };
+    case "AWAITING_TRANSFER":
+    default:
+      return {
+        label: "Oczekuje na przelew",
+        cls: "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20",
+      };
+  }
+}
+
 export const INPUT_CLS =
   "w-full bg-panel-2 border border-white/[0.1] focus:border-brand/70 hover:border-white/[0.18] outline-none px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 transition";

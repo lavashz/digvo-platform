@@ -24,6 +24,12 @@ class BookingStatus(str, enum.Enum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+    
+
+class PaymentStatus(str, enum.Enum):
+    AWAITING_TRANSFER = "AWAITING_TRANSFER"
+    TRANSFER_REPORTED = "TRANSFER_REPORTED"
+    DEPOSIT_CONFIRMED = "DEPOSIT_CONFIRMED"
 
 
 class BlockReason(str, enum.Enum):
@@ -146,6 +152,12 @@ class Booking(Base):
 
     total_price_net: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     deposit_paid: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
+    
+    payment_status: Mapped[PaymentStatus] = mapped_column(
+        Enum(PaymentStatus),
+        default=PaymentStatus.AWAITING_TRANSFER,
+    )
+    
     has_damage_waiver: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[BookingStatus] = mapped_column(Enum(BookingStatus), default=BookingStatus.PENDING)
     contract_pdf_url: Mapped[str | None] = mapped_column(String(512))

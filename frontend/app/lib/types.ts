@@ -56,6 +56,9 @@ export interface Booking {
   delivery_address: string | null;
   total_price_net: number;
   status: string;
+  payment_status?: string;
+  deposit_paid?: number;
+  deposit_required?: number;
   protocols: Protocol[];
 }
 

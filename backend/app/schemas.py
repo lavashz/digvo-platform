@@ -157,3 +157,7 @@ class VendorRegisterRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=255)
     phone: str = Field(min_length=6, max_length=32)
     nip: str = Field(min_length=10, max_length=32)
+    
+
+class BookingPaymentUpdate(BaseModel):
+    payment_status: str  # AWAITING_TRANSFER | TRANSFER_REPORTED | DEPOSIT_CONFIRMED
