@@ -19,6 +19,7 @@ import { API_URL, authHeaders, formatApiError } from "../lib/api";
 import { DEMO_ACCOUNTS, INPUT_CLS, SITE_PRESETS, resolveMachineVendor } from "../lib/vendors";
 import type { BookingQuote, Machine } from "../lib/types";
 import { t, formatMoney, type Locale, type Currency } from "../lib/i18n";
+import { usePrefs } from "../lib/usePrefs";
 import { machineImageUrl } from "../lib/machineImages";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
@@ -93,8 +94,7 @@ function BookingPage() {
     quickLogin,
   } = useAuth();
 
-  const [locale, setLocale] = useState<Locale>("pl");
-  const [currency, setCurrency] = useState<Currency>("PLN");
+  const { locale, setLocale, currency, setCurrency } = usePrefs();
   const [eurRate, setEurRate] = useState(4.25);
   const [machine, setMachine] = useState<Machine | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -135,18 +135,6 @@ function BookingPage() {
 
   const invalidSameDayHours =
     !!startDate && !!endDate && startDate === endDate && endHour <= startHour;
-
-  useEffect(() => {
-    const savedLocale = localStorage.getItem("digvo_locale");
-    const savedCurrency = localStorage.getItem("digvo_currency");
-    if (savedLocale === "pl" || savedLocale === "en") setLocale(savedLocale);
-    if (savedCurrency === "PLN" || savedCurrency === "EUR") setCurrency(savedCurrency);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("digvo_locale", locale);
-    localStorage.setItem("digvo_currency", currency);
-  }, [locale, currency]);
 
   useEffect(() => {
     fetch(`${API_URL}/fx/eur`)
@@ -737,7 +725,7 @@ function BookingPage() {
                 <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
                 <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
                 <div className="flex flex-wrap gap-x-5 gap-y-1">
-                    <span>Platforma demo — praca inżynierska</span>
+                    <span>Marketplace wynajmu maszyn · Bydgoszcz</span>
                     <Link href="/regulamin" className="hover:text-zinc-400 transition">
                       Regulamin
                     </Link>

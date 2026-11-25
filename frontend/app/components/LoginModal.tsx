@@ -37,6 +37,7 @@ interface LoginModalProps {
   onRegister: (payload: RegisterPayload) => Promise<boolean>;
   onVendorRegister: (payload: RegisterPayload & { nip: string }) => Promise<boolean>;
   onQuickLogin: (email: string) => Promise<boolean>;
+  preferVendor?: boolean;
 }
 
 const ROLE_TABS = [
@@ -69,6 +70,7 @@ export default function LoginModal({
   onRegister,
   onVendorRegister,
   onQuickLogin,
+  preferVendor = false,
 
 }: LoginModalProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -111,8 +113,13 @@ export default function LoginModal({
       setNip("");
       setNipHint(null);
       setAsVendor(false);
+      return;
     }
-  }, [open]);
+    if (preferVendor) {
+      setMode("register");
+      setAsVendor(true);
+    }
+  }, [open, preferVendor]);
 
   const visibleAccounts = useMemo(
     () => accounts.filter((a) => a.role === roleTab),

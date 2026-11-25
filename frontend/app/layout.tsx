@@ -1,3 +1,4 @@
+import Providers from "./components/Providers";
 import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
@@ -60,7 +61,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pl" className={`h-full antialiased ${display.variable} ${body.variable}`}>
-      <body className="min-h-full flex flex-col font-body">{children}</body>
+      <body className="min-h-full flex flex-col font-body">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

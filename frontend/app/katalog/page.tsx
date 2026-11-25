@@ -11,6 +11,7 @@ import { DEMO_ACCOUNTS, VENDORS, resolveMachineVendor } from "../lib/vendors";
 import { machineImageUrl } from "../lib/machineImages";
 import type { Machine } from "../lib/types";
 import { t, formatMoney, type Locale, type Currency } from "../lib/i18n";
+import { usePrefs } from "../lib/usePrefs";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
 import SoftSelect from "../components/SoftSelect";
@@ -30,8 +31,7 @@ export default function CatalogPage() {
     quickLogin,
   } = useAuth();
 
-  const [locale, setLocale] = useState<Locale>("pl");
-  const [currency, setCurrency] = useState<Currency>("PLN");
+  const { locale, setLocale, currency, setCurrency } = usePrefs();
   const [eurRate, setEurRate] = useState(4.25);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,18 +39,6 @@ export default function CatalogPage() {
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const { flash, show, clear } = useFlash();
-
-  useEffect(() => {
-    const savedLocale = localStorage.getItem("digvo_locale");
-    const savedCurrency = localStorage.getItem("digvo_currency");
-    if (savedLocale === "pl" || savedLocale === "en") setLocale(savedLocale);
-    if (savedCurrency === "PLN" || savedCurrency === "EUR") setCurrency(savedCurrency);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("digvo_locale", locale);
-    localStorage.setItem("digvo_currency", currency);
-  }, [locale, currency]);
 
   useEffect(() => {
     fetch(`${API_URL}/fx/eur`)
@@ -268,7 +256,7 @@ export default function CatalogPage() {
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
             <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
             <div className="flex flex-wrap gap-x-5 gap-y-1">
-              <span>Platforma demo — praca inżynierska</span>
+              <span>Marketplace wynajmu maszyn · Bydgoszcz</span>
               <Link href="/regulamin" className="hover:text-zinc-400 transition">
                 Regulamin
               </Link>

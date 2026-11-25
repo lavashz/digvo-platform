@@ -993,14 +993,15 @@ def update_booking_schedule(
         raise HTTPException(status_code=403, detail="Brak uprawnień do zmiany harmonogramu.")
 
     if is_owner and not is_staff:
-        expected_end = booking.end_time + timedelta(days=1)
         same_start = abs((payload.start_time - booking.start_time).total_seconds()) < 2
         same_machine = payload.machine_id is None or payload.machine_id == booking.machine_id
-        same_end = abs((payload.end_time - expected_end).total_seconds()) < 2
-        if not (same_start and same_machine and same_end):
+        delta = payload.end_time - booking.end_time
+        days = round(delta.total_seconds() / 86400)
+        exact_day = abs(delta.total_seconds() - days * 86400) < 2
+        if not (same_start and same_machine and exact_day and 1 <= days <= 7):
             raise HTTPException(
                 status_code=400,
-                detail="Możesz tylko przedłużyć rezerwację o dokładnie 1 dzień.",
+                detail="Możesz przedłużyć rezerwację o 1–7 dni (bez zmiany startu i maszyny).",
             )
 
     if booking.status == BookingStatus.CANCELLED:

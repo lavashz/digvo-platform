@@ -8,6 +8,7 @@ import { ArrowRightIcon, HardHatIcon, TruckIcon, FileIcon } from "./components/I
 import { useAuth } from "./lib/auth";
 import { DEMO_ACCOUNTS } from "./lib/vendors";
 import { t, type Locale, type Currency } from "./lib/i18n";
+import { usePrefs } from "./lib/usePrefs";
 import Toast from "./components/Toast";
 import { useFlash } from "./lib/flash";
 
@@ -43,21 +44,15 @@ export default function HomePage() {
     quickLogin,
   } = useAuth();
 
-  const [locale, setLocale] = useState<Locale>("pl");
-  const [currency, setCurrency] = useState<Currency>("PLN");
+  const { locale, setLocale, currency, setCurrency } = usePrefs();
   const { flash, show, clear } = useFlash();
 
-  useEffect(() => {
-    const savedLocale = localStorage.getItem("digvo_locale");
-    const savedCurrency = localStorage.getItem("digvo_currency");
-    if (savedLocale === "pl" || savedLocale === "en") setLocale(savedLocale);
-    if (savedCurrency === "PLN" || savedCurrency === "EUR") setCurrency(savedCurrency);
-  }, []);
+  const [loginPreferVendor, setLoginPreferVendor] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem("digvo_locale", locale);
-    localStorage.setItem("digvo_currency", currency);
-  }, [locale, currency]);
+  const openLogin = (asVendor = false) => {
+    setLoginPreferVendor(asVendor);
+    setShowLogin(true);
+  };
 
   return (
     <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] antialiased flex flex-col">
@@ -67,7 +62,7 @@ export default function HomePage() {
         onLocale={setLocale}
         onCurrency={setCurrency}
         authUser={authUser}
-        onLoginClick={() => setShowLogin(true)}
+        onLoginClick={() => openLogin(false)}
         onLogout={() => {
           logout();
           show(t(locale, "loggedOut"), "info")
@@ -173,7 +168,7 @@ export default function HomePage() {
                     {cat.label}
                   </p>
                   <p className="mt-1 text-[11px] text-brand font-medium opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
-                    Przeglądaj →
+                    {t(locale, "browseCategory")}
                   </p>
                 </div>
               </Link>
@@ -183,14 +178,25 @@ export default function HomePage() {
           {/* dodatkowy rząd — 2 większe kafelki */}
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {[
-              { label: "Koparki kołowe", img: IMG.liebherr, hint: "Liebherr i podobne" },
-              { label: "Ładowarki teleskopowe", img: IMG.tele, hint: "Manitou MT i inne" },
+              {
+                label: "Koparki kołowe",
+                category: "Koparki kołowe",
+                img: IMG.liebherr,
+                hint: "Liebherr i podobne",
+              },
+              {
+                label: "Ładowarki teleskopowe",
+                category: "Ładowarki teleskopowe",
+                img: IMG.tele,
+                hint: "Manitou MT i inne",
+              },
             ].map((cat) => (
               <Link
                 key={cat.label}
-                href="/katalog"
+                href={`/katalog?category=${encodeURIComponent(cat.category)}`}
                 className="group relative block h-44 sm:h-52 overflow-hidden rounded-2xl bg-[#1a1a1c] ring-1 ring-white/10"
               >
+              
                 <img
                   src={cat.img}
                   alt={cat.label}
@@ -240,6 +246,64 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* FAQ B2B */}
+        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-16">
+          <div className="mb-8">
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+              {t(locale, "faqTitle")}
+            </h2>
+            <p className="mt-2 text-sm text-zinc-400 max-w-xl">
+              {t(locale, "faqSub")}
+            </p>
+          </div>
+          <div className="divide-y divide-white/[0.08] border-y border-white/[0.08]">
+            {(
+              [
+                ["faqQ1", "faqA1"],
+                ["faqQ2", "faqA2"],
+                ["faqQ3", "faqA3"],
+                ["faqQ4", "faqA4"],
+                ["faqQ5", "faqA5"],
+              ] as const
+            ).map(([q, a]) => (
+              <details key={q} className="group py-4">
+                <summary className="cursor-pointer list-none flex items-center justify-between gap-4 text-[15px] font-medium text-white">
+                  {t(locale, q)}
+                  <span className="text-brand text-lg leading-none group-open:rotate-45 transition">+</span>
+                </summary>
+                <p className="mt-3 text-sm text-zinc-400 leading-relaxed max-w-2xl">
+                  {t(locale, a)}
+                </p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        {/* CTA DOSTAWCY */}
+        <section className="border-t border-white/[0.06] bg-[#0c0c0e]">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-16 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+            <div className="max-w-lg">
+              <p className="text-brand text-xs font-semibold tracking-[0.22em] uppercase mb-3">
+                B2B · dostawcy
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                {t(locale, "joinVendorTitle")}
+              </h2>
+              <p className="mt-3 text-sm text-zinc-400 leading-relaxed">
+                {t(locale, "joinVendorSub")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => openLogin(true)}
+              className="inline-flex items-center gap-2 self-start bg-white hover:bg-zinc-100 text-black font-semibold px-7 py-3.5 rounded-full text-[15px] transition"
+            >
+              {t(locale, "joinVendorCta")}
+              <ArrowRightIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </section>
+
         {/* CTA */}
         <section className="relative overflow-hidden border-t border-white/[0.06]">
           <img src={IMG.loader} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -285,7 +349,7 @@ export default function HomePage() {
     <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
       <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
       <div className="flex flex-wrap gap-x-5 gap-y-1">
-        <span>Platforma demo — praca inżynierska</span>
+        <span>{t(locale, "footerTagline")}</span>
         <Link href="/regulamin" className="hover:text-zinc-400 transition">
           Regulamin
         </Link>
@@ -301,7 +365,11 @@ export default function HomePage() {
 
       <LoginModal
         open={showLogin}
-        onClose={closeLogin}
+        preferVendor={loginPreferVendor}
+        onClose={() => {
+          closeLogin();
+          setLoginPreferVendor(false);
+        }}
         accounts={DEMO_ACCOUNTS}
         error={loginError}
         onClearError={clearLoginError}

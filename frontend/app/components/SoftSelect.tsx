@@ -10,6 +10,7 @@ interface SoftSelectProps {
   onChange: (value: string) => void;
   ariaLabel?: string;
   className?: string;
+  size?: "md" | "sm";
 }
 
 export default function SoftSelect({
@@ -18,6 +19,7 @@ export default function SoftSelect({
   onChange,
   ariaLabel,
   className = "",
+  size = "md",
 }: SoftSelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -41,6 +43,8 @@ export default function SoftSelect({
     };
   }, [open]);
 
+  const sm = size === "sm";
+
   return (
     <div ref={rootRef} className={`relative ${className}`}>
       <button
@@ -48,7 +52,11 @@ export default function SoftSelect({
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full lg:min-w-[12rem] flex items-center justify-between gap-3 bg-panel-2 border border-white/[0.1] hover:border-white/[0.18] focus:border-brand/60 rounded-full px-4 py-3 text-sm text-white outline-none transition"
+        className={
+          sm
+            ? "w-full min-w-0 flex items-center justify-between gap-2 bg-panel-2 border border-white/[0.1] hover:border-white/[0.18] focus:border-brand/60 rounded-full px-3 py-1.5 text-xs text-white outline-none transition"
+            : "w-full lg:min-w-[12rem] flex items-center justify-between gap-3 bg-panel-2 border border-white/[0.1] hover:border-white/[0.18] focus:border-brand/60 rounded-full px-4 py-3 text-sm text-white outline-none transition"
+        }
       >
         <span className="truncate text-left">{current?.label ?? "—"}</span>
         <span className={`text-zinc-500 text-[10px] transition ${open ? "rotate-180" : ""}`}>▼</span>
@@ -56,7 +64,9 @@ export default function SoftSelect({
       {open && (
         <ul
           role="listbox"
-          className="absolute z-30 mt-2 w-full min-w-[12rem] max-h-64 overflow-auto rounded-2xl border border-white/[0.1] bg-[#121214] shadow-2xl shadow-black/50 py-1 animate-fade-in"
+          className={`absolute z-30 mt-1.5 w-full max-h-64 overflow-auto rounded-2xl border border-white/[0.1] bg-[#121214] shadow-2xl shadow-black/50 py-1 animate-fade-in ${
+            sm ? "min-w-0 right-0" : "min-w-[12rem]"
+          }`}
         >
           {options.map((o) => {
             const active = o.value === value;

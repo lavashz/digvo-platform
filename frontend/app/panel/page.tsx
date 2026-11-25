@@ -10,6 +10,7 @@ import { API_URL, authHeaders, formatApiError } from "../lib/api";
 import { DEMO_ACCOUNTS, INPUT_CLS, statusMeta, paymentMeta } from "../lib/vendors";
 import type { Booking, Machine, UnavailabilityBlock } from "../lib/types";
 import { t, type Locale, type Currency } from "../lib/i18n";
+import { usePrefs } from "../lib/usePrefs";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
 import FleetGantt from "../components/FleetGantt";
@@ -32,8 +33,7 @@ export default function PanelPage() {
     quickLogin,
   } = useAuth();
 
-  const [locale, setLocale] = useState<Locale>("pl");
-  const [currency, setCurrency] = useState<Currency>("PLN");
+  const { locale, setLocale, currency, setCurrency } = usePrefs();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [blocks, setBlocks] = useState<UnavailabilityBlock[]>([]);
@@ -43,6 +43,7 @@ export default function PanelPage() {
   const [ganttMode, setGanttMode] = useState<"week" | "day">("week");
   const [ganttAnchor, setGanttAnchor] = useState<Date | null>(null);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [extendDaysPanel, setExtendDaysPanel] = useState("1");
   const [dispatcherTab, setDispatcherTab] = useState<"schedule" | "fleet">("schedule");
   const [mthInputs, setMthInputs] = useState<Record<string, string>>({});
   const [handoverPhotos, setHandoverPhotos] = useState<Record<string, string>>({});
@@ -66,20 +67,8 @@ export default function PanelPage() {
   const { flash, show, clear } = useFlash();
 
   useEffect(() => {
-    const savedLocale = localStorage.getItem("digvo_locale");
-    const savedCurrency = localStorage.getItem("digvo_currency");
-    if (savedLocale === "pl" || savedLocale === "en") setLocale(savedLocale);
-    if (savedCurrency === "PLN" || savedCurrency === "EUR") setCurrency(savedCurrency);
-  }, []);
-
-  useEffect(() => {
     setGanttAnchor(new Date());
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem("digvo_locale", locale);
-    localStorage.setItem("digvo_currency", currency);
-  }, [locale, currency]);
 
   const reload = async () => {
     if (!authUser?.token) return;
@@ -209,6 +198,33 @@ export default function PanelPage() {
     } else {
       show(formatApiError(data.detail, "Błąd statusu."), "error");
     }
+  };
+
+  const toLocalIso = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  const extendSelected = async () => {
+    if (!selectedBooking) return;
+    if (
+      selectedBooking.status !== "CONFIRMED" &&
+      selectedBooking.status !== "IN_PROGRESS"
+    ) {
+      show("Można przedłużyć tylko aktywne zlecenie.", "error");
+      return;
+    }
+    const days = Math.min(7, Math.max(1, Number(extendDaysPanel || "1")));
+    const start = new Date(selectedBooking.start_time);
+    const end = new Date(selectedBooking.end_time);
+    end.setDate(end.getDate() + days);
+    const ok = await handleSchedule({
+      bookingId: selectedBooking.id,
+      start_time: toLocalIso(start),
+      end_time: toLocalIso(end),
+      machine_id: selectedBooking.machine_id,
+    });
+    if (ok) show(`Przedłużono o ${days} dni.`);
   };
 
   const setPayment = async (bookingId: string, payment_status: string) => {
@@ -875,6 +891,30 @@ const fleetMachines = useMemo(
                   >
                     PDF
                   </a>
+                  {(selectedBooking.status === "CONFIRMED" ||
+                    selectedBooking.status === "IN_PROGRESS") && (
+                    <div className="inline-flex items-center gap-1.5">
+                      <div className="w-[7.5rem]">
+                        <SoftSelect
+                          size="sm"
+                          value={extendDaysPanel}
+                          onChange={setExtendDaysPanel}
+                          options={[1, 2, 3, 4, 5, 6, 7].map((n) => ({
+                            value: String(n),
+                            label: n === 1 ? "1 dzień" : `${n} dni`,
+                          }))}
+                          ariaLabel="Przedłuż o"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={extendSelected}
+                        className="inline-flex items-center text-xs font-medium border border-brand/40 text-brand hover:bg-brand hover:text-black px-2.5 py-1.5 rounded-full transition"
+                      >
+                        Przedłuż
+                      </button>
+                    </div>
+                  )}
                   {selectedBooking.status === "CONFIRMED" && (
                     <button
                       type="button"
@@ -1424,7 +1464,7 @@ const fleetMachines = useMemo(
                 <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
                 <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
                 <div className="flex flex-wrap gap-x-5 gap-y-1">
-                    <span>Platforma demo — praca inżynierska</span>
+                    <span>Marketplace wynajmu maszyn · Bydgoszcz</span>
                     <Link href="/regulamin" className="hover:text-zinc-400 transition">
                       Regulamin
                     </Link>

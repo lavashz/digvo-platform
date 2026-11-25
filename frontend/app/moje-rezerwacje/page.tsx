@@ -9,10 +9,12 @@ import { useAuth } from "../lib/auth";
 import { DEMO_ACCOUNTS, resolveMachineVendor, statusMeta, paymentMeta } from "../lib/vendors";
 import type { Booking, Machine } from "../lib/types";
 import { t, formatMoney, type Locale, type Currency } from "../lib/i18n";
+import { usePrefs } from "../lib/usePrefs";
 import Toast from "../components/Toast";
 import { useFlash } from "../lib/flash";
 import { API_URL, authHeaders, formatApiError } from "../lib/api";
 import { machineImageUrl } from "../lib/machineImages";
+import SoftSelect from "../components/SoftSelect";
 
 
 export default function MyBookingsPage() {
@@ -31,25 +33,13 @@ export default function MyBookingsPage() {
     quickLogin,
   } = useAuth();
 
-  const [locale, setLocale] = useState<Locale>("pl");
-  const [currency, setCurrency] = useState<Currency>("PLN");
+  const { locale, setLocale, currency, setCurrency } = usePrefs();
   const [eurRate, setEurRate] = useState(4.25);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(false);
   const { flash, show, clear } = useFlash();
-
-  useEffect(() => {
-    const savedLocale = localStorage.getItem("digvo_locale");
-    const savedCurrency = localStorage.getItem("digvo_currency");
-    if (savedLocale === "pl" || savedLocale === "en") setLocale(savedLocale);
-    if (savedCurrency === "PLN" || savedCurrency === "EUR") setCurrency(savedCurrency);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("digvo_locale", locale);
-    localStorage.setItem("digvo_currency", currency);
-  }, [locale, currency]);
+  const [extendDays, setExtendDays] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch(`${API_URL}/machines`)
@@ -95,15 +85,16 @@ export default function MyBookingsPage() {
       .finally(() => setLoading(false));
   };
 
-  const extendOneDay = async (b: Booking) => {
+  const extendByDays = async (b: Booking) => {
     if (!authUser) return;
     if (b.status !== "CONFIRMED" && b.status !== "IN_PROGRESS") {
-      show("Można przedłużyć tylko aktywne zlecenie.", "error");
+      show(t(locale, "extendOnlyActive"), "error");
       return;
     }
+    const days = Math.min(7, Math.max(1, Number(extendDays[b.id] || "1")));
     const start = new Date(b.start_time);
     const end = new Date(b.end_time);
-    end.setDate(end.getDate() + 1);
+    end.setDate(end.getDate() + days);
     const res = await fetch(`${API_URL}/bookings/${b.id}/schedule`, {
       method: "PATCH",
       headers: authHeaders(authUser.token),
@@ -113,13 +104,12 @@ export default function MyBookingsPage() {
         machine_id: b.machine_id,
       }),
     });
-    
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      show("Przedłużono o 1 dzień. Cena przeliczona.");
+      show(t(locale, "extendOk"));
       reloadMine();
     } else {
-      show(formatApiError(data.detail, "Nie udało się przedłużyć."), "error");
+      show(formatApiError(data.detail, t(locale, "extendFail")), "error");
     }
   };
 
@@ -293,7 +283,7 @@ export default function MyBookingsPage() {
                         </div>
                       </td>
                       <td className="py-4 pl-4 pr-3 align-middle text-right">
-                        <div className="inline-flex flex-wrap justify-end gap-1.5">
+                        <div className="flex flex-col items-end gap-1.5">
                           {(!b.payment_status || b.payment_status === "AWAITING_TRANSFER") &&
                             b.status !== "CANCELLED" && (
                             <button
@@ -304,23 +294,44 @@ export default function MyBookingsPage() {
                               {t(locale, "reportTransfer")}
                             </button>
                           )}
-                          {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
-                            <button
-                              type="button"
-                              onClick={() => extendOneDay(b)}
-                              className="inline-flex items-center text-xs font-medium border border-brand/40 text-brand hover:bg-brand hover:text-black px-3 py-1.5 rounded-full transition"
+                          <div className="inline-flex flex-wrap justify-end items-center gap-1.5">
+                            {(b.status === "CONFIRMED" || b.status === "IN_PROGRESS") && (
+                              <>
+                                <div className="w-[6.75rem] shrink-0">
+                                  <SoftSelect
+                                    size="sm"
+                                    value={extendDays[b.id] || "1"}
+                                    onChange={(v) =>
+                                      setExtendDays((prev) => ({ ...prev, [b.id]: v }))
+                                    }
+                                    options={[1, 2, 3, 4, 5, 6, 7].map((n) => ({
+                                      value: String(n),
+                                      label:
+                                        n === 1
+                                          ? t(locale, "day1")
+                                          : t(locale, "dayN").replace("{n}", String(n)),
+                                    }))}
+                                    ariaLabel={t(locale, "extendByDays")}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => extendByDays(b)}
+                                  className="inline-flex items-center text-xs font-medium border border-brand/40 text-brand hover:bg-brand hover:text-black px-3 py-1.5 rounded-full transition"
+                                >
+                                  {t(locale, "extendOneDay")}
+                                </button>
+                              </>
+                            )}
+                            <a
+                              href={`${API_URL}/bookings/${b.id}/pdf`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-medium bg-white/[0.08] hover:bg-white hover:text-black border border-white/[0.12] px-3 py-1.5 rounded-full transition"
                             >
-                              {t(locale, "extendOneDay")}
-                            </button>
-                          )}
-                          <a
-                            href={`${API_URL}/bookings/${b.id}/pdf`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-white/[0.08] hover:bg-white hover:text-black border border-white/[0.12] px-3 py-1.5 rounded-full transition"
-                          >
-                            <FileIcon className="w-3.5 h-3.5" /> PDF
-                          </a>
+                              <FileIcon className="w-3.5 h-3.5" /> PDF
+                            </a>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -355,7 +366,7 @@ export default function MyBookingsPage() {
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
             <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
             <div className="flex flex-wrap gap-x-5 gap-y-1">
-              <span>Platforma demo — praca inżynierska</span>
+              <span>Marketplace wynajmu maszyn · Bydgoszcz</span>
               <Link href="/regulamin" className="hover:text-zinc-400 transition">
                 Regulamin
               </Link>
