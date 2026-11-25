@@ -1,7 +1,12 @@
+import os
 import math
 from fastapi.responses import Response
 from app.pdf_generator import generate_booking_pdf
-from app.mailer import send_booking_confirmation
+from app.mailer import (
+    send_booking_confirmation,
+    send_booking_status_notice,
+    send_payment_notice,
+)
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
@@ -912,7 +917,22 @@ def update_booking_status(
     db.commit()
     db.refresh(booking)
     
+    try:
+        client = db.get(User, booking.client_id)
+        if client and client.email:
+            send_booking_status_notice(
+                to_email=client.email,
+                booking_id=str(booking.id),
+                machine_name=machine.name,
+                status=booking.status.value,
+                start_time=booking.start_time.isoformat(sep=" ", timespec="minutes"),
+                end_time=booking.end_time.isoformat(sep=" ", timespec="minutes"),
+            )
+    except Exception:
+        pass
+
     return {"id": str(booking.id), "status": booking.status.value}
+    
 
 @app.patch("/bookings/{booking_id}/payment")
 def update_booking_payment(
@@ -964,10 +984,43 @@ def update_booking_payment(
 
     db.commit()
     db.refresh(booking)
+    
+    try:
+        client = db.get(User, booking.client_id)
+        if is_client and booking.payment_status == PaymentStatus.TRANSFER_REPORTED:
+            if client and client.email:
+                send_payment_notice(
+                    to_email=client.email,
+                    booking_id=str(booking.id),
+                    machine_name=machine.name,
+                    payment_status="TRANSFER_REPORTED",
+                    notify_role="client",
+                )
+            staff_to = (os.getenv("MAIL_DISPATCHER") or "").strip()
+            if staff_to:
+                send_payment_notice(
+                    to_email=staff_to,
+                    booking_id=str(booking.id),
+                    machine_name=machine.name,
+                    payment_status="TRANSFER_REPORTED",
+                    notify_role="staff",
+                )
+        elif is_staff and client and client.email:
+            send_payment_notice(
+                to_email=client.email,
+                booking_id=str(booking.id),
+                machine_name=machine.name,
+                payment_status=booking.payment_status.value,
+                notify_role="client",
+            )
+    except Exception:
+        pass
+
     return {
         "id": str(booking.id),
         **_payment_fields(booking, machine),
     }
+    
 
 @app.patch("/bookings/{booking_id}/schedule")
 def update_booking_schedule(
