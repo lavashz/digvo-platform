@@ -38,6 +38,7 @@ export default function PanelPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [blocks, setBlocks] = useState<UnavailabilityBlock[]>([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [paymentFilter, setPaymentFilter] = useState<"ALL" | "TRANSFER_REPORTED">("ALL");
   const [timeFilter, setTimeFilter] = useState<"ALL" | "TODAY" | "WEEK" | "DAY">("TODAY");
   const [dayFilterIso, setDayFilterIso] = useState<string | null>(null);
   const [ganttMode, setGanttMode] = useState<"week" | "day">("week");
@@ -148,6 +149,7 @@ export default function PanelPage() {
 
     let list = bookings.filter((b) => {
       if (statusFilter !== "ALL" && b.status !== statusFilter) return false;
+      if (paymentFilter !== "ALL" && b.payment_status !== paymentFilter) return false;
       const s = new Date(b.start_time);
       const e = new Date(b.end_time);
       if (timeFilter === "TODAY") {
@@ -167,11 +169,14 @@ export default function PanelPage() {
       return true;
     });
 
-    list = [...list].sort(
-      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    );
+    list = [...list].sort((a, b) => {
+      const pa = a.payment_status === "TRANSFER_REPORTED" ? 0 : 1;
+      const pb = b.payment_status === "TRANSFER_REPORTED" ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+    });
     return list;
-  }, [bookings, statusFilter, timeFilter, dayFilterIso, ganttAnchor]);
+  }, [bookings, statusFilter, paymentFilter, timeFilter, dayFilterIso, ganttAnchor]);
 
   const selectedBooking = useMemo(
     () => bookings.find((b) => b.id === selectedBookingId) || null,
@@ -1065,8 +1070,35 @@ const fleetMachines = useMemo(
                    {selectedBooking.total_price_net} zł ·{" "}
                    {statusMeta(selectedBooking.status, locale).label}
                  </p>
+                 {(selectedBooking.deposit_required ?? 0) > 0 && (
+                    <p className="mt-1 text-xs text-zinc-400">
+                      Kaucja:{" "}
+                      <span className="tabular-nums text-zinc-200">
+                        {selectedBooking.deposit_required} zł
+                      </span>
+                      {" · "}
+                      <span className={paymentMeta(selectedBooking.payment_status, locale).cls + " px-2 py-0.5 rounded-full text-[10px]"}>
+                        {paymentMeta(selectedBooking.payment_status, locale).label}
+                      </span>
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
+
+                  {selectedBooking.status !== "CANCELLED" &&
+                    selectedBooking.payment_status === "TRANSFER_REPORTED" && (
+                    <button
+                      type="button"
+                      onClick={() => setPayment(selectedBooking.id, "DEPOSIT_CONFIRMED")}
+                      className="inline-flex items-center text-xs font-semibold border border-emerald-500/40 text-emerald-300 hover:bg-emerald-400 hover:text-black px-2.5 py-1.5 rounded-full transition"
+                    >
+                      {t(locale, "confirmDeposit")}
+                      {(selectedBooking.deposit_required ?? 0) > 0
+                        ? ` (${selectedBooking.deposit_required} zł)`
+                        : ""}
+                    </button>
+                  )}
+
                   <a
                     href={`${API_URL}/bookings/${selectedBooking.id}/pdf`}
                     target="_blank"
@@ -1098,6 +1130,7 @@ const fleetMachines = useMemo(
                         Przedłuż
                       </button>
                     </div>
+
                   )}
                   {selectedBooking.status === "CONFIRMED" && (
                     <button
@@ -1184,6 +1217,27 @@ const fleetMachines = useMemo(
                       {k === "ALL" ? t(locale, "statusFilterAll") : statusMeta(k, locale).label}
                     </button>
                   ))}
+
+                  {(
+                    [
+                      ["ALL", t(locale, "paymentFilterAll")],
+                      ["TRANSFER_REPORTED", t(locale, "paymentFilterReported")],
+                    ] as const
+                  ).map(([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setPaymentFilter(k)}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition ${
+                        paymentFilter === k
+                          ? "bg-amber-400 text-black border-amber-400"
+                          : "bg-transparent text-zinc-400 border-white/10 hover:border-white/25 hover:text-white"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+
                 </div>
               </div>
               <div className="overflow-x-auto scroll-thin">
@@ -1211,7 +1265,13 @@ const fleetMachines = useMemo(
                         return (
                           <tr
                             key={b.id}
-                            className={`${selected ? "bg-white/[0.04]" : ""} cursor-pointer hover:bg-white/[0.03]`}
+                            className={`${
+                              selected
+                                ? "bg-white/[0.04]"
+                                : b.payment_status === "TRANSFER_REPORTED"
+                                  ? "bg-amber-500/[0.06]"
+                                  : ""
+                            } cursor-pointer hover:bg-white/[0.03]`}
                             onClick={() => setSelectedBookingId(b.id)}
                           >
                             <td className="py-3 pl-3 pr-2 align-middle text-white">{machineName(b.machine_id)}</td>
@@ -1255,13 +1315,13 @@ const fleetMachines = useMemo(
                                   PDF
                                 </a>
 
-                                {b.payment_status !== "DEPOSIT_CONFIRMED" && b.status !== "CANCELLED" && (
+                                {b.payment_status === "TRANSFER_REPORTED" && b.status !== "CANCELLED" && (
                                   <button
                                     type="button"
                                     onClick={() => setPayment(b.id, "DEPOSIT_CONFIRMED")}
                                     className="inline-flex items-center text-xs font-medium border border-emerald-500/40 text-emerald-300 hover:bg-emerald-400 hover:text-black px-2.5 py-1.5 rounded-full transition"
                                   >
-                                    Potwierdź kaucję
+                                    {t(locale, "confirmDeposit")}
                                   </button>
                                 )}
                                 {b.status === "CONFIRMED" && (

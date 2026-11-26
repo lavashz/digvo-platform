@@ -280,6 +280,20 @@ export default function MyBookingsPage() {
                           <span className={`inline-flex w-fit px-2.5 py-1 rounded-full text-[11px] ${paymentMeta(b.payment_status, locale).cls}`}>
                             {paymentMeta(b.payment_status, locale).label}
                           </span>
+                          {(b.deposit_required ?? 0) > 0 && (
+                            <p className="text-[11px] text-zinc-500 max-w-[11rem] leading-snug">
+                              {t(locale, "depositAmount")}:{" "}
+                              <span className="tabular-nums text-zinc-300">
+                                {money(b.deposit_required || 0)}
+                              </span>
+                              <br />
+                              {b.payment_status === "DEPOSIT_CONFIRMED"
+                                ? t(locale, "depositHintConfirmed")
+                                : b.payment_status === "TRANSFER_REPORTED"
+                                  ? t(locale, "depositHintReported")
+                                  : t(locale, "depositHintAwaiting")}
+                            </p>
+                          )}
                         </div>
                       </td>
                       <td className="py-4 pl-4 pr-3 align-middle text-right">
