@@ -1224,6 +1224,27 @@ def create_handover_protocol(
     if existing:
         raise HTTPException(status_code=409, detail=f"Protokół typu {payload.protocol_type} został już sporządzony.")
 
+    if not payload.photo_data_url:
+        raise HTTPException(status_code=400, detail="Wymagane zdjęcie licznika.")
+    if not payload.signature_data_url:
+        raise HTTPException(status_code=400, detail="Wymagany podpis na protokole.")
+
+    if payload.protocol_type == "RETURN":
+        pickup_row = db.execute(
+            select(HandoverProtocol).where(
+                HandoverProtocol.booking_id == booking_id,
+                HandoverProtocol.protocol_type == "PICKUP",
+            )
+        ).scalar_one_or_none()
+        if pickup_row and payload.engine_hours_reading < pickup_row.engine_hours_reading:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Odczyt zwrotu ({payload.engine_hours_reading}) nie może być mniejszy "
+                    f"niż odbiór ({pickup_row.engine_hours_reading} mth)."
+                ),
+            )
+    
     media: dict = {}
     if payload.notes:
         media["notes"] = payload.notes

@@ -48,6 +48,7 @@ export default function PanelPage() {
   const [mthInputs, setMthInputs] = useState<Record<string, string>>({});
   const [handoverPhotos, setHandoverPhotos] = useState<Record<string, string>>({});
   const [handoverSigs, setHandoverSigs] = useState<Record<string, string>>({});
+  const [handoverStep, setHandoverStep] = useState<Record<string, number>>({});
 
   const [blockMachineId, setBlockMachineId] = useState("");
   const [blockDate, setBlockDate] = useState("");
@@ -434,51 +435,69 @@ const handleDeleteMachine = async (m: Machine) => {
   };
 
  const handleHandover = async (bookingId: string, protocolType: "PICKUP" | "RETURN") => {
-    if (!authUser) return;
-    const val = mthInputs[bookingId];
-    if (!val || isNaN(Number(val))) {
-      show("Wpisz poprawny odczyt mth.", "error");
+  if (!authUser) return;
+  const val = mthInputs[bookingId];
+  if (!val || isNaN(Number(val))) {
+    show("Krok 1/3: wpisz poprawny odczyt mth.", "error");
+    return;
+  }
+  const photo = handoverPhotos[bookingId];
+  const sig = handoverSigs[bookingId];
+  if (!photo) {
+    show("Krok 2/3: dodaj zdjęcie licznika.", "error");
+    return;
+  }
+  if (!sig) {
+    show("Krok 3/3: złóż podpis na polu poniżej.", "error");
+    return;
+  }
+
+  if (protocolType === "RETURN") {
+    const job = operatorJobs.find((j) => j.b.id === bookingId);
+    const pickupMth = job?.pickup ? Number(job.pickup.engine_hours_reading) : null;
+    if (pickupMth != null && Number(val) < pickupMth) {
+      show(`Odczyt zwrotu nie może być < odbioru (${pickupMth} mth).`, "error");
       return;
     }
-    const photo = handoverPhotos[bookingId];
-    const sig = handoverSigs[bookingId];
-    if (!photo) {
-      show("Dodaj zdjęcie licznika.", "error");
-      return;
-    }
-    if (!sig) {
-      show("Złóż podpis na polu poniżej.", "error");
-      return;
-    }
-    const res = await fetch(`${API_URL}/bookings/${bookingId}/handover`, {
-      method: "POST",
-      headers: authHeaders(authUser.token),
-      body: JSON.stringify({
-        protocol_type: protocolType,
-        engine_hours_reading: Number(val),
-        photo_data_url: photo,
-        signature_data_url: sig,
-      }),
+  }
+
+  const res = await fetch(`${API_URL}/bookings/${bookingId}/handover`, {
+    method: "POST",
+    headers: authHeaders(authUser.token),
+    body: JSON.stringify({
+      protocol_type: protocolType,
+      engine_hours_reading: Number(val),
+      photo_data_url: photo,
+      signature_data_url: sig,
+    }),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    show(data.message || "Zapisano protokół.");
+    setMthInputs((p) => ({ ...p, [bookingId]: "" }));
+    setHandoverPhotos((p) => {
+      const n = { ...p };
+      delete n[bookingId];
+      return n;
     });
-    const data = await res.json();
-    if (res.ok) {
-      show(data.message || "Zapisano protokół.");
-      setMthInputs((p) => ({ ...p, [bookingId]: "" }));
-      setHandoverPhotos((p) => {
-        const n = { ...p };
-        delete n[bookingId];
-        return n;
-      });
-      setHandoverSigs((p) => {
-        const n = { ...p };
-        delete n[bookingId];
-        return n;
-      });
-      reload();
-    } else {
-      show(formatApiError(data.detail, "Błąd protokołu."), "error");
-    }
-  };
+    setHandoverSigs((p) => {
+      const n = { ...p };
+      delete n[bookingId];
+      return n;
+    });
+
+    setHandoverStep((p) => {
+      const n = { ...p };
+      delete n[bookingId];
+      return n;
+    });
+
+    window.open(`${API_URL}/bookings/${bookingId}/pdf`, "_blank", "noopener,noreferrer");
+    reload();
+  } else {
+    show(formatApiError(data.detail, "Błąd protokołu."), "error");
+  }
+};
 
   const operatorJobs = useMemo(() => {
   return bookings
@@ -614,7 +633,7 @@ const fleetMachines = useMemo(
                               </p>
                             )}
                             <h2 className="text-xl font-semibold text-white leading-tight">
-                              {machineName(b.machine_id)}
+                              {b.machine_name || machineName(b.machine_id)}
                             </h2>
                             <p className="flex items-start gap-1.5 text-sm text-zinc-400 mt-2">
                                 <PinIcon className="w-4 h-4 mt-0.5 shrink-0" />
@@ -660,129 +679,294 @@ const fleetMachines = useMemo(
                         </div>
 
                         {nextAction && (
-                            <div className={`space-y-3 ${isNext ? "sticky bottom-4 z-10" : ""}`}>
-                            <label className="block text-xs text-zinc-500 uppercase tracking-wide">
-                              Odczyt motogodzin
-                            </label>
-                            <input
-                                type="number"
-                                inputMode="decimal"
-                                step="0.1"
-                                placeholder="np. 1450.5"
-                                value={mthInputs[b.id] || ""}
-                                onChange={(e) =>
-                                setMthInputs((p) => ({ ...p, [b.id]: e.target.value }))
-                                }
-                                className={`${INPUT_CLS} w-full rounded-2xl px-5 py-4 text-lg tabular-nums`}
-                            />
+                          <div className="space-y-3 border-t border-white/[0.08] pt-4">
+                            {(() => {
+                              const mthOk =
+                                !!(mthInputs[b.id] && !isNaN(Number(mthInputs[b.id])));
+                              const photoOk = !!handoverPhotos[b.id];
+                              const sigOk = !!handoverSigs[b.id];
+                              const step = handoverStep[b.id] || 1;
+                              const ready = mthOk && photoOk && sigOk;
 
-                                <div className="space-y-2">
-                                  <label className="block text-xs text-zinc-500 uppercase tracking-wide">
-                                    Zdjęcie licznika
-                                  </label>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    capture="environment"
-                                    className="block w-full text-sm text-zinc-400 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-white"
-                                    onChange={async (e) => {
-                                      const f = e.target.files?.[0];
-                                      if (!f) return;
-                                      try {
-                                        const url = await compressImage(f);
-                                        setHandoverPhotos((p) => ({ ...p, [b.id]: url }));
-                                      } catch {
-                                        show("Nie udało się wczytać zdjęcia.", "error");
+                              return (
+                                <>
+                                  <div className="flex gap-1.5">
+                                    {[1, 2, 3].map((n) => (
+                                      <div
+                                        key={n}
+                                        className={`h-1 flex-1 rounded-full ${
+                                          n < step || (n === step && ready) || (n === 1 && mthOk) || (n === 2 && photoOk) || (n === 3 && sigOk)
+                                            ? "bg-brand"
+                                            : n === step
+                                              ? "bg-brand/40"
+                                              : "bg-white/10"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <p className="text-xs text-zinc-400">
+                                    Krok {step}/3 —{" "}
+                                    {step === 1
+                                      ? "odczyt motogodzin"
+                                      : step === 2
+                                        ? "zdjęcie licznika"
+                                        : "podpis"}
+                                  </p>
+
+                                  <div
+                                    className={`flex flex-col justify-start gap-3 ${
+                                      step >= 2 ? "min-h-[200px]" : ""
+                                    }`}
+                                  >
+
+                                  {step === 1 && (
+                                    <input
+                                      type="number"
+                                      inputMode="decimal"
+                                      step="0.1"
+                                      placeholder="np. 1450.5"
+                                      value={mthInputs[b.id] || ""}
+                                      onChange={(e) =>
+                                        setMthInputs((p) => ({ ...p, [b.id]: e.target.value }))
                                       }
-                                    }}
-                                  />
-                                  {handoverPhotos[b.id] && (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                      src={handoverPhotos[b.id]}
-                                      alt="Licznik"
-                                      className="mt-2 w-full max-h-40 object-cover rounded-xl border border-white/10"
+                                      className={`${INPUT_CLS} w-full rounded-2xl px-5 py-4 text-lg tabular-nums`}
+                                      autoFocus={isNext}
                                     />
                                   )}
-                                </div>
 
-                                <div className="space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <label className="text-xs text-zinc-500 uppercase tracking-wide">
-                                      Podpis
-                                    </label>
+                                  {step === 2 && (
+                                    <div className="min-h-[200px] flex flex-col gap-3">
+                                      {handoverPhotos[b.id] ? (
+                                        <>
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img
+                                            src={handoverPhotos[b.id]}
+                                            alt="Licznik"
+                                            className="w-full h-[200px] object-cover rounded-2xl border border-white/10"
+                                          />
+                                          <div className="flex gap-2">
+                                            <label className="flex-1 min-h-[44px] inline-flex items-center justify-center rounded-2xl border border-white/15 text-sm font-medium text-zinc-200 hover:bg-white/10 cursor-pointer transition">
+                                              Zmień zdjęcie
+                                              <input
+                                                type="file"
+                                                accept="image/*"
+                                                capture="environment"
+                                                className="sr-only"
+                                                onChange={async (e) => {
+                                                  const f = e.target.files?.[0];
+                                                  if (!f) return;
+                                                  try {
+                                                    const url = await compressImage(f);
+                                                    setHandoverPhotos((p) => ({
+                                                      ...p,
+                                                      [b.id]: url,
+                                                    }));
+                                                  } catch {
+                                                    show("Nie udało się wczytać zdjęcia.", "error");
+                                                  }
+                                                }}
+                                              />
+                                            </label>
+                                            <button
+                                              type="button"
+                                              className="min-h-[44px] px-4 rounded-2xl border border-white/15 text-sm text-zinc-300 hover:bg-white/10 transition"
+                                              onClick={() =>
+                                                setHandoverPhotos((p) => {
+                                                  const n = { ...p };
+                                                  delete n[b.id];
+                                                  return n;
+                                                })
+                                              }
+                                            >
+                                              Usuń
+                                            </button>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <label className="flex flex-1 min-h-[200px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-4 cursor-pointer hover:border-brand/40 transition">
+                                          <span className="text-sm text-zinc-300 font-medium">
+                                            Zrób / wybierz zdjęcie licznika
+                                          </span>
+                                          <span className="text-[11px] text-zinc-500">
+                                            aparat lub galeria
+                                          </span>
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            capture="environment"
+                                            className="sr-only"
+                                            onChange={async (e) => {
+                                              const f = e.target.files?.[0];
+                                              if (!f) return;
+                                              try {
+                                                const url = await compressImage(f);
+                                                setHandoverPhotos((p) => ({
+                                                  ...p,
+                                                  [b.id]: url,
+                                                }));
+                                              } catch {
+                                                show("Nie udało się wczytać zdjęcia.", "error");
+                                              }
+                                            }}
+                                          />
+                                        </label>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {step === 3 && (
+                                    <div className="space-y-3">
+                                      <p className="text-xs text-zinc-500">
+                                        Podpisz palcem / myszą na polu poniżej
+                                      </p>
+                                      <div className="w-full h-28 shrink-0 rounded-xl bg-zinc-200 border border-white/10 overflow-hidden">
+                                        <canvas
+                                          id={`sig-${b.id}`}
+                                          width={360}
+                                          height={120}
+                                          className="block w-full h-28 touch-none"
+                                          ref={(canvas) => {
+                                            if (!canvas) return;
+                                            const existing = handoverSigs[b.id];
+                                            if (!existing) return;
+                                            const ctx = canvas.getContext("2d");
+                                            if (!ctx) return;
+                                            if (canvas.dataset.sigLoaded === existing) return;
+                                            const img = new Image();
+                                            img.onload = () => {
+                                              ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                              canvas.dataset.sigLoaded = existing;
+                                            };
+                                            img.src = existing;
+                                          }}
+                                          onPointerDown={(e) => {
+                                            const c = e.currentTarget;
+                                            const ctx = c.getContext("2d");
+                                            if (!ctx) return;
+                                            c.setPointerCapture(e.pointerId);
+                                            ctx.strokeStyle = "#18181b";
+                                            ctx.lineWidth = 2.5;
+                                            ctx.lineCap = "round";
+                                            ctx.beginPath();
+                                            const r = c.getBoundingClientRect();
+                                            ctx.moveTo(
+                                              ((e.clientX - r.left) / r.width) * c.width,
+                                              ((e.clientY - r.top) / r.height) * c.height
+                                            );
+                                          }}
+                                          onPointerMove={(e) => {
+                                            if (!e.currentTarget.hasPointerCapture(e.pointerId))
+                                              return;
+                                            const c = e.currentTarget;
+                                            const ctx = c.getContext("2d");
+                                            if (!ctx) return;
+                                            const r = c.getBoundingClientRect();
+                                            ctx.lineTo(
+                                              ((e.clientX - r.left) / r.width) * c.width,
+                                              ((e.clientY - r.top) / r.height) * c.height
+                                            );
+                                            ctx.stroke();
+                                          }}
+                                          onPointerUp={(e) => {
+                                            const c = e.currentTarget;
+                                            c.releasePointerCapture(e.pointerId);
+                                            const data = readSignature(c);
+                                            if (data) {
+                                              c.dataset.sigLoaded = data;
+                                              setHandoverSigs((p) => ({
+                                                ...p,
+                                                [b.id]: data,
+                                              }));
+                                            }
+                                          }}
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        disabled={!handoverSigs[b.id]}
+                                        className={`w-full min-h-[44px] rounded-2xl border text-sm font-medium transition ${
+                                          handoverSigs[b.id]
+                                            ? "border-white/15 text-zinc-200 hover:bg-white/10"
+                                            : "border-white/10 text-zinc-600 cursor-not-allowed"
+                                        }`}
+                                        onClick={() => {
+                                          const c = document.getElementById(
+                                            `sig-${b.id}`
+                                          ) as HTMLCanvasElement | null;
+                                          const ctx = c?.getContext("2d");
+                                          if (c && ctx) {
+                                            ctx.clearRect(0, 0, c.width, c.height);
+                                            delete c.dataset.sigLoaded;
+                                          }
+                                          setHandoverSigs((p) => {
+                                            const n = { ...p };
+                                            delete n[b.id];
+                                            return n;
+                                          });
+                                        }}
+                                      >
+                                        Wyczyść i podpisz ponownie
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  </div>
+
+                                  {step < 3 ? (
                                     <button
                                       type="button"
-                                      className="text-xs text-zinc-400"
-                                      onClick={() => {
-                                        const c = document.getElementById(
-                                          `sig-${b.id}`
-                                        ) as HTMLCanvasElement | null;
-                                        const ctx = c?.getContext("2d");
-                                        if (c && ctx) {
-                                          ctx.clearRect(0, 0, c.width, c.height);
-                                        }
-                                        setHandoverSigs((p) => {
-                                          const n = { ...p };
-                                          delete n[b.id];
-                                          return n;
-                                        });
-                                      }}
-                                    >
-                                      Wyczyść
-                                    </button>
-                                  </div>
-                                  <canvas
-                                    id={`sig-${b.id}`}
-                                    width={360}
-                                    height={140}
-                                    className="w-full h-36 rounded-xl bg-white touch-none"
-                                    onPointerDown={(e) => {
-                                      const c = e.currentTarget;
-                                      const ctx = c.getContext("2d");
-                                      if (!ctx) return;
-                                      c.setPointerCapture(e.pointerId);
-                                      ctx.strokeStyle = "#111";
-                                      ctx.lineWidth = 2.5;
-                                      ctx.lineCap = "round";
-                                      ctx.beginPath();
-                                      const r = c.getBoundingClientRect();
-                                      ctx.moveTo(
-                                        ((e.clientX - r.left) / r.width) * c.width,
-                                        ((e.clientY - r.top) / r.height) * c.height
-                                      );
-                                    }}
-                                    onPointerMove={(e) => {
-                                      if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
-                                      const c = e.currentTarget;
-                                      const ctx = c.getContext("2d");
-                                      if (!ctx) return;
-                                      const r = c.getBoundingClientRect();
-                                      ctx.lineTo(
-                                        ((e.clientX - r.left) / r.width) * c.width,
-                                        ((e.clientY - r.top) / r.height) * c.height
-                                      );
-                                      ctx.stroke();
-                                    }}
-                                    onPointerUp={(e) => {
-                                      const c = e.currentTarget;
-                                      c.releasePointerCapture(e.pointerId);
-                                      const data = readSignature(c);
-                                      if (data) {
-                                        setHandoverSigs((p) => ({ ...p, [b.id]: data }));
+                                      disabled={
+                                        (step === 1 && !mthOk) || (step === 2 && !photoOk)
                                       }
-                                    }}
-                                  />
-                                </div>
-                            
-                            <button
-                                type="button"
-                                onClick={() => handleHandover(b.id, nextAction)}
-                                className="w-full min-h-[52px] bg-brand text-black font-bold text-base rounded-2xl active:scale-[0.99] transition"
-                            >
-                                {nextAction === "PICKUP" ? "Zapisz odbiór" : "Zapisz zwrot"}
-                            </button>
-                            </div>
+                                      onClick={() =>
+                                        setHandoverStep((p) => ({
+                                          ...p,
+                                          [b.id]: step + 1,
+                                        }))
+                                      }
+                                      className={`w-full min-h-[48px] font-semibold text-[15px] rounded-2xl transition ${
+                                        (step === 1 && mthOk) || (step === 2 && photoOk)
+                                          ? "bg-brand text-black active:scale-[0.99]"
+                                          : "bg-white/[0.08] text-zinc-500 cursor-not-allowed"
+                                      }`}
+                                    >
+                                      Dalej
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled={!ready}
+                                      onClick={() => handleHandover(b.id, nextAction)}
+                                      className={`w-full min-h-[48px] font-semibold text-[15px] rounded-2xl transition ${
+                                        ready
+                                          ? "bg-brand text-black active:scale-[0.99]"
+                                          : "bg-white/[0.08] text-zinc-500 cursor-not-allowed"
+                                      }`}
+                                    >
+                                      {ready
+                                        ? nextAction === "PICKUP"
+                                          ? "Zapisz odbiór i otwórz PDF"
+                                          : "Zapisz zwrot i otwórz PDF"
+                                        : "Złóż podpis, żeby zapisać"}
+                                    </button>
+                                  )}
+
+                                    {step > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setHandoverStep((p) => ({ ...p, [b.id]: step - 1 }))
+                                        }
+                                        className="w-full min-h-[44px] rounded-2xl border border-white/15 text-sm font-medium text-zinc-200 hover:bg-white/10 active:scale-[0.99] transition"
+                                      >
+                                        ← Wróć
+                                      </button>
+                                    )}
+                                </>
+                              );
+                            })()}
+                          </div>
                         )}
                         </div>
                     );
