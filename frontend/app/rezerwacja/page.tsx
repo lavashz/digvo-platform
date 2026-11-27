@@ -137,6 +137,13 @@ function BookingPage() {
     !!startDate && !!endDate && startDate === endDate && endHour <= startHour;
 
   useEffect(() => {
+    const s = searchParams.get("start");
+    const e = searchParams.get("end");
+    if (s) setStartDate(s);
+    if (e) setEndDate(e);
+  }, [searchParams]);
+
+  useEffect(() => {
     fetch(`${API_URL}/fx/eur`)
       .then((r) => r.json())
       .then((d) => {

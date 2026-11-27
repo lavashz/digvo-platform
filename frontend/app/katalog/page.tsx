@@ -38,6 +38,8 @@ export default function CatalogPage() {
   const [vendorFilter, setVendorFilter] = useState("ALL");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const { flash, show, clear } = useFlash();
 
   useEffect(() => {
@@ -57,12 +59,16 @@ export default function CatalogPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${API_URL}/machines`)
+    const qs =
+      fromDate && toDate
+        ? `?from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`
+        : "";
+    fetch(`${API_URL}/machines${qs}`)
       .then((r) => r.json())
       .then((data) => setMachines(Array.isArray(data) ? data : []))
       .catch(() => setMachines([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [fromDate, toDate]);
 
   const categories = useMemo(() => {
     const unique = Array.from(new Set(machines.map((m) => m.category)));
@@ -163,8 +169,42 @@ export default function CatalogPage() {
                 }))}
               />
             </label>
-          </div>
 
+            <label className="block">
+              <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">{t(locale, "dateFrom")}</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="bg-panel-2 border border-white/[0.1] focus:border-brand/60 rounded-full px-4 py-3 text-sm text-white outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] text-zinc-500 mb-1.5 px-1">{t(locale, "dateTo")}</span>
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+                className="bg-panel-2 border border-white/[0.1] focus:border-brand/60 rounded-full px-4 py-3 text-sm text-white outline-none"
+              />
+            </label>
+            {(fromDate || toDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                }}
+                className="text-xs text-zinc-400 hover:text-white transition px-2 py-3"
+              >
+                {t(locale, "clearDates")}
+              </button>
+            )}
+
+
+          </div>
+            <p className="text-[11px] text-zinc-500 mb-2">{t(locale, "dateFilterHint")}</p>
           <p className="text-xs text-zinc-500 mb-5">
             {filtered.length} {t(locale, "resultsOf")}
           </p>
@@ -190,7 +230,11 @@ export default function CatalogPage() {
                 return (
                   <Link
                     key={m.id}
-                    href={`/rezerwacja?machine=${m.id}`}
+                    href={
+                      fromDate && toDate
+                        ? `/rezerwacja?machine=${m.id}&start=${fromDate}&end=${toDate}`
+                        : `/rezerwacja?machine=${m.id}`
+                    }
                     className="group block rounded-2xl overflow-hidden bg-[#111113] border border-white/[0.06] hover:border-white/[0.14] transition-colors"
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-[#1a1a1c]">
@@ -204,16 +248,16 @@ export default function CatalogPage() {
                       <span className="absolute top-3 left-3 text-[11px] font-medium bg-black/55 backdrop-blur-sm text-white px-2.5 py-1 rounded-full">
                         {vendor.shortName}
                       </span>
-                      <span className="absolute top-3 right-3 text-[11px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-400/20 px-2.5 py-1 rounded-full">
-                        {t(locale, "available")}
-                      </span>
-                      <div className="absolute bottom-3 left-3 right-3">
-                        <p className="text-lg font-semibold text-white tracking-tight drop-shadow">
-                          {money(m.daily_rate_net)}
-                          <span className="text-xs font-normal text-zinc-300">{t(locale, "perDay")}</span>
-                        </p>
+                        <span className="absolute top-3 right-3 text-[11px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-400/20 px-2.5 py-1 rounded-full">
+                          {fromDate && toDate ? t(locale, "freeInRange") : t(locale, "available")}
+                        </span>
+                        <div className="absolute bottom-3 left-3 right-3">
+                          <p className="text-lg font-semibold text-white tracking-tight drop-shadow">
+                            {money(m.daily_rate_net)}
+                            <span className="text-xs font-normal text-zinc-300">{t(locale, "perDay")}</span>
+                          </p>
+                        </div>
                       </div>
-                    </div>
                     <div className="p-4">
                       <h2 className="text-[15px] font-semibold text-white leading-snug tracking-tight line-clamp-2">
                         {m.name}

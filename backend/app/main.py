@@ -428,14 +428,56 @@ def register_vendor(payload: VendorRegisterRequest, db: Session = Depends(get_db
 
 
 @app.get("/machines")
-def list_machines(db: Session = Depends(get_db)):
+def list_machines(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    db: Session = Depends(get_db),
+):
     machines = db.execute(
         select(Machine)
         .options(joinedload(Machine.organization))
         .where(Machine.is_published.is_(True))
     ).scalars().unique().all()
-    return [
-        {
+
+    window_start = window_end = None
+    if from_date and to_date:
+        try:
+            start_d = datetime.strptime(from_date, "%Y-%m-%d").date()
+            end_d = datetime.strptime(to_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="from_date/to_date w formacie YYYY-MM-DD")
+        if end_d < start_d:
+            raise HTTPException(status_code=400, detail="to_date musi być >= from_date")
+        window_start = datetime.combine(start_d, datetime.min.time()).replace(tzinfo=WARSAW)
+        window_end = datetime.combine(end_d, datetime.max.time()).replace(tzinfo=WARSAW)
+
+    result = []
+    for m in machines:
+        if window_start is not None and window_end is not None:
+            if m.udt_valid_until and m.udt_valid_until < end_d:
+                continue
+            buffer = timedelta(hours=m.service_buffer_hours)
+            busy_booking = db.execute(
+                select(Booking.id).where(
+                    Booking.machine_id == m.id,
+                    Booking.status != BookingStatus.CANCELLED,
+                    Booking.start_time < window_end + buffer,
+                    Booking.end_time > window_start - buffer,
+                ).limit(1)
+            ).first()
+            if busy_booking:
+                continue
+            busy_block = db.execute(
+                select(UnavailabilityBlock.id).where(
+                    UnavailabilityBlock.machine_id == m.id,
+                    UnavailabilityBlock.start_time < window_end + buffer,
+                    UnavailabilityBlock.end_time > window_start,
+                ).limit(1)
+            ).first()
+            if busy_block:
+                continue
+
+        result.append({
             "id": str(m.id),
             "organization_id": str(m.organization_id),
             "organization_name": m.organization.name if m.organization else None,
@@ -449,9 +491,8 @@ def list_machines(db: Session = Depends(get_db)):
             "service_buffer_hours": m.service_buffer_hours,
             "image_url": m.image_url,
             "is_published": bool(m.is_published),
-        }
-        for m in machines
-    ]
+        })
+    return result
     
 @app.get("/machines/fleet")
 def list_fleet_machines(
