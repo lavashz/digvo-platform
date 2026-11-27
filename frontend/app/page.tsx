@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import LoginModal from "./components/LoginModal";
 import SiteHeader from "./components/SiteHeader";
+import SiteFooter from "./components/SiteFooter";
 import { ArrowRightIcon, HardHatIcon, TruckIcon, FileIcon } from "./components/Icons";
 import { useAuth } from "./lib/auth";
 import { DEMO_ACCOUNTS } from "./lib/vendors";
@@ -120,10 +121,10 @@ export default function HomePage() {
         <section className="border-b border-white/[0.06] bg-[#0c0c0e]">
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             {[
-              ["3", t(locale, "trustVendors")],
+              [t(locale, "trustLocalValue"), t(locale, "trustLocal")],
               ["UDT", t(locale, "trustOperators")],
               ["PDF", t(locale, "trustContract")],
-              ["24h", t(locale, "trustBooking")],
+              [t(locale, "trustContactValue"), t(locale, "trustContact")],
             ].map(([k, v]) => (
               <div key={v} className="flex items-baseline gap-2">
                 <span className="text-brand font-semibold text-lg tabular-nums">{k}</span>
@@ -328,38 +329,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      <footer className="border-t border-white/[0.06] mt-auto">
-  <div className="hazard h-1 opacity-70" />
-  <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-zinc-500">
-    <div>
-      <p className="text-sm text-zinc-300 font-medium">Digvo</p>
-      <p className="mt-1">Krótkoterminowy wynajem maszyn z operatorem i transportem.</p>
-    </div>
-    <div className="flex gap-5">
-      <Link href="/katalog" className="hover:text-white transition">
-        {t(locale, "navCatalog")}
-      </Link>
-      <Link href="/moje-rezerwacje" className="hover:text-white transition">
-        {t(locale, "navMyBookings")}
-      </Link>
-    </div>
-  </div>
-
-  <div className="border-t border-white/[0.06] bg-black">
-    <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-zinc-500">
-      <p>© 2026 Digvo. Wszelkie prawa zastrzeżone.</p>
-      <div className="flex flex-wrap gap-x-5 gap-y-1">
-        <span>{t(locale, "footerTagline")}</span>
-        <Link href="/regulamin" className="hover:text-zinc-400 transition">
-          Regulamin
-        </Link>
-        <Link href="/polityka-prywatnosci" className="hover:text-zinc-400 transition">
-          Polityka prywatności
-        </Link>
-      </div>
-    </div>
-  </div>
-</footer>
+      <SiteFooter locale={locale} />
 
 <Toast flash={flash} onClose={clear} />
 

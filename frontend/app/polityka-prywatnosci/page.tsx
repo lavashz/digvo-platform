@@ -11,28 +11,32 @@ export default function PolitykaPage() {
         </Link>
         <h1 className="text-3xl font-semibold tracking-tight">Polityka prywatności</h1>
         <p className="text-sm text-zinc-400 leading-relaxed">
-          Dokument demonstracyjny na potrzeby pracy inżynierskiej Digvo.
+          Informacja o przetwarzaniu danych osobowych w serwisie Digvo.
         </p>
         <section className="space-y-3 text-sm text-zinc-300 leading-relaxed">
           <h2 className="text-lg font-semibold text-white">1. Jakie dane przetwarzamy</h2>
           <p>
-            W demo: adres e-mail, imię i nazwisko, telefon (przy rejestracji), dane rezerwacji
-            (termin, maszyna, adres dostawy) oraz odczyty motogodzin w protokołach.
+            Adres e-mail, imię i nazwisko, telefon (przy rejestracji), NIP (dla dostawców),
+            dane rezerwacji (termin, maszyna, adres dostawy) oraz odczyty motogodzin
+            i dokumentacja protokołów zdawczo-odbiorczych.
           </p>
           <h2 className="text-lg font-semibold text-white">2. Cel</h2>
           <p>
-            Realizacja rezerwacji, autoryzacja JWT, generowanie umowy PDF oraz obsługa panelu
-            dyspozytora/operatora.
+            Realizacja rezerwacji, logowanie, generowanie umowy PDF, obsługa kaucji oraz
+            panelu dyspozytora i operatora.
           </p>
           <h2 className="text-lg font-semibold text-white">3. Przechowywanie</h2>
           <p>
-            Dane trafiają do bazy PostgreSQL (Neon) poprzez API FastAPI (Render). Frontend działa
-            na Vercel. Token sesji trzymany jest lokalnie w przeglądarce.
+            Dane są przechowywane w zabezpieczonej bazie powiązanej z API Digvo. Token sesji
+            jest trzymany lokalnie w przeglądarce użytkownika.
           </p>
           <h2 className="text-lg font-semibold text-white">4. Kontakt</h2>
           <p>
-            W środowisku produkcyjnym należałoby podać dane administratora. Tutaj: projekt
-            akademicki Digvo — bez komercyjnego administratora danych.
+            W sprawach danych osobowych:{" "}
+            <a href="mailto:kontakt@digvo.pl" className="text-brand hover:text-brand-soft">
+              kontakt@digvo.pl
+            </a>
+            .
           </p>
         </section>
       </main>

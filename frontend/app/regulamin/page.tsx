@@ -11,29 +11,41 @@ export default function RegulaminPage() {
         </Link>
         <h1 className="text-3xl font-semibold tracking-tight">Regulamin</h1>
         <p className="text-sm text-zinc-400 leading-relaxed">
-          Niniejszy dokument ma charakter demonstracyjny i stanowi część pracy inżynierskiej
-          platformy Digvo (marketplace krótkoterminowego wynajmu sprzętu budowlanego).
+          Regulamin korzystania z platformy Digvo — marketplace krótkoterminowego wynajmu
+          maszyn budowlanych z operatorem i transportem (obszar Bydgoszcz i okolice).
         </p>
         <section className="space-y-3 text-sm text-zinc-300 leading-relaxed">
           <h2 className="text-lg font-semibold text-white">1. Zakres usługi</h2>
           <p>
-            Digvo umożliwia przeglądanie oferty maszyn, wycenę (maszyna / operator / transport)
-            oraz złożenie rezerwacji zakończonej generowaniem umowy PDF.
+            Digvo umożliwia przeglądanie oferty wypożyczalni, wycenę (maszyna / operator /
+            transport) oraz złożenie rezerwacji z umową PDF i obsługą kaucji.
           </p>
           <h2 className="text-lg font-semibold text-white">2. Konta i role</h2>
           <p>
-            System rozróżnia role klienta, dyspozytora i operatora. Dostęp do panelu floty
-            wymaga konta z odpowiednimi uprawnieniami.
+            Dostępne są konta klienta oraz konta dostawców (dyspozytor / operator). Panel floty
+            wymaga konta z uprawnieniami wypożyczalni.
           </p>
-          <h2 className="text-lg font-semibold text-white">3. Rezerwacje</h2>
+          <h2 className="text-lg font-semibold text-white">3. Rezerwacje i kaucja</h2>
           <p>
-            Rezerwacja jest wiążąca w ramach środowiska demo. Kolizje terminów są blokowane
-            po stronie API i bazy danych. Anulowanie lub zmiana statusu leży po stronie dyspozytora.
+            Rezerwacja jest potwierdzana w systemie. Kolizje terminów są blokowane automatycznie.
+            Status kaucji (do przelewu / zgłoszony / potwierdzony) widać w Moich rezerwacjach
+            oraz w panelu dyspozytora. Anulowanie lub zmiana statusu zlecenia leży po stronie
+            wypożyczalni.
           </p>
           <h2 className="text-lg font-semibold text-white">4. Odpowiedzialność</h2>
           <p>
-            Platforma nie jest produkcyjnym systemem komercyjnym. Dane testowe, ceny i dostępność
-            służą wyłącznie celom prezentacji i obrony pracy.
+            Digvo pośredniczy w rezerwacji między klientem a wypożyczalnią. Warunki najmu,
+            kaucji i odpowiedzialności za sprzęt wynikają z umowy PDF oraz protokołu
+            zdawczo-odbiorczego. Spory o uszkodzenia rozstrzygane są na podstawie protokołu
+            z dokumentacją zdjęciową.
+          </p>
+          <h2 className="text-lg font-semibold text-white">5. Kontakt</h2>
+          <p>
+            Pytania o platformę:{" "}
+            <a href="mailto:kontakt@digvo.pl" className="text-brand hover:text-brand-soft">
+              kontakt@digvo.pl
+            </a>
+            .
           </p>
         </section>
       </main>

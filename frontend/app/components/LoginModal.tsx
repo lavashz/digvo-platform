@@ -46,6 +46,8 @@ const ROLE_TABS = [
   { key: "OPERATOR", label: "Operator" },
 ] as const;
 
+const SHOW_DEMO = process.env.NEXT_PUBLIC_SHOW_DEMO === "1";
+
 function splitLabel(label: string) {
   const idx = label.indexOf(":");
   if (idx === -1) return { kind: "", name: label };
@@ -411,7 +413,7 @@ export default function LoginModal({
             </button>
           </form>
 
-          {mode === "login" && (
+          {mode === "login" && SHOW_DEMO && (
             <>
               <div className="flex items-center gap-3 my-6">
                 <span className="h-px flex-1 bg-white/[0.08]" />
@@ -468,9 +470,11 @@ export default function LoginModal({
             </>
           )}
 
-          <p className="mt-6 flex items-center justify-center gap-1.5 text-[11px] text-zinc-500">
+          <p className="mt-6 flex items-center gap-1.5 justify-center text-[11px] text-zinc-500">
             <ShieldIcon className="w-3.5 h-3.5" />
-            Środowisko demonstracyjne — dane testowe
+            {SHOW_DEMO
+              ? "Środowisko demonstracyjne — dane testowe"
+              : "Bezpieczne logowanie · Digvo Bydgoszcz"}
           </p>
         </div>
       </div>
