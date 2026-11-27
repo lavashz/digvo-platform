@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import LoginModal from "../components/LoginModal";
 import SiteHeader from "../components/SiteHeader";
 import { FileIcon } from "../components/Icons";
@@ -17,7 +18,7 @@ import { machineImageUrl } from "../lib/machineImages";
 import SoftSelect from "../components/SoftSelect";
 
 
-export default function MyBookingsPage() {
+function MyBookingsPage() {
   const {
     authUser,
     ready,
@@ -40,6 +41,18 @@ export default function MyBookingsPage() {
   const [loading, setLoading] = useState(false);
   const { flash, show, clear } = useFlash();
   const [extendDays, setExtendDays] = useState<Record<string, string>>({});
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [showNextSteps, setShowNextSteps] = useState(false);
+
+useEffect(() => {
+  if (searchParams.get("fresh") === "1") setShowNextSteps(true);
+}, [searchParams]);
+
+const dismissNextSteps = () => {
+  setShowNextSteps(false);
+  router.replace("/moje-rezerwacje");
+};
 
   useEffect(() => {
     fetch(`${API_URL}/machines`)
@@ -154,6 +167,31 @@ export default function MyBookingsPage() {
           {t(locale, "myBookings")}
         </h1>
         <p className="mt-2 text-sm text-zinc-400">{t(locale, "myBookingsSub")}</p>
+
+        {authUser && showNextSteps && (
+          <div className="mt-6 rounded-3xl border border-brand/30 bg-brand/[0.06] p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white tracking-tight">
+                  {t(locale, "nextStepsTitle")}
+                </p>
+                <p className="mt-1 text-xs text-zinc-400">{t(locale, "nextStepsSub")}</p>
+              </div>
+              <button
+                type="button"
+                onClick={dismissNextSteps}
+                className="text-xs font-medium text-zinc-400 hover:text-white transition"
+              >
+                {t(locale, "nextStepsDismiss")}
+              </button>
+            </div>
+            <ol className="mt-4 space-y-2 text-sm text-zinc-300 list-decimal list-inside">
+              <li>{t(locale, "nextStep1")}</li>
+              <li>{t(locale, "nextStep2")}</li>
+              <li>{t(locale, "nextStep3")}</li>
+            </ol>
+          </div>
+        )}
 
         {!ready ? (
           <div className="mt-10 space-y-3">
@@ -404,5 +442,19 @@ export default function MyBookingsPage() {
         onQuickLogin={quickLogin}
       />
     </div>
+  );
+}
+
+export default function MyBookingsPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#09090b] text-zinc-400 flex items-center justify-center text-sm">
+          Ładowanie…
+        </div>
+      }
+    >
+      <MyBookingsPage />
+    </Suspense>
   );
 }

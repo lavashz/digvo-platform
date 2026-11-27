@@ -270,8 +270,8 @@ function BookingPage() {
         if (!res.ok) {
             show(formatApiError(data.detail, "Błąd rezerwacji."), "error");
         } else {
-            show("Rezerwacja potwierdzona. Umowa PDF też w e-mailu (jeśli skonfigurowano).");
-            window.setTimeout(() => router.push("/moje-rezerwacje"), 900);
+            show(t(locale, "bookingOkToast"));
+            window.setTimeout(() => router.push("/moje-rezerwacje?fresh=1"), 900);
         }
       } catch {
         show("Błąd sieci przy rezerwacji.", "error");
