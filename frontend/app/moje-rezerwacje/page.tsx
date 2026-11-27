@@ -44,6 +44,7 @@ function MyBookingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showNextSteps, setShowNextSteps] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
 useEffect(() => {
   if (searchParams.get("fresh") === "1") setShowNextSteps(true);
@@ -64,13 +65,21 @@ const dismissNextSteps = () => {
   useEffect(() => {
     if (!authUser) {
       setBookings([]);
+      setLoadError(false);
       return;
     }
     setLoading(true);
+    setLoadError(false);
     fetch(`${API_URL}/bookings/my`, { headers: authHeaders(authUser.token) })
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((d) => setBookings(Array.isArray(d) ? d : []))
-      .catch(() => setBookings([]))
+      .catch(() => {
+        setBookings([]);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, [authUser]);
 
@@ -91,10 +100,17 @@ const dismissNextSteps = () => {
   const reloadMine = () => {
     if (!authUser) return;
     setLoading(true);
+    setLoadError(false);
     fetch(`${API_URL}/bookings/my`, { headers: authHeaders(authUser.token) })
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((d) => setBookings(Array.isArray(d) ? d : []))
-      .catch(() => setBookings([]))
+      .catch(() => {
+        setBookings([]);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -213,11 +229,16 @@ const dismissNextSteps = () => {
               {t(locale, "login")}
             </button>
           </div>
-        ) : loading ? (
-          <div className="mt-10 space-y-3">
-            {[1, 2, 3, 4].map((n) => (
-              <div key={n} className="h-16 rounded-2xl skeleton" />
-            ))}
+        ) : loadError ? (
+          <div className="mt-10 rounded-3xl border border-white/[0.08] bg-[#111113] p-10 text-center space-y-4">
+            <p className="text-sm text-zinc-400 max-w-md mx-auto">{t(locale, "apiLoadFail")}</p>
+            <button
+              type="button"
+              onClick={reloadMine}
+              className="inline-flex bg-brand hover:bg-brand-soft text-black font-semibold px-5 py-2.5 rounded-full text-sm"
+            >
+              {t(locale, "apiRetry")}
+            </button>
           </div>
         ) : bookings.length === 0 ? (
           <div className="mt-10 rounded-3xl border border-dashed border-white/[0.12] bg-[#111113] p-10 sm:p-14 text-center">

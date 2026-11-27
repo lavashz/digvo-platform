@@ -35,6 +35,8 @@ export default function CatalogPage() {
   const [eurRate, setEurRate] = useState(4.25);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
   const [vendorFilter, setVendorFilter] = useState("ALL");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,17 +60,34 @@ export default function CatalogPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setLoadError(false);
     const qs =
       fromDate && toDate
         ? `?from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`
         : "";
     fetch(`${API_URL}/machines${qs}`)
-      .then((r) => r.json())
-      .then((data) => setMachines(Array.isArray(data) ? data : []))
-      .catch(() => setMachines([]))
-      .finally(() => setLoading(false));
-  }, [fromDate, toDate]);
+      .then(async (r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setMachines(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMachines([]);
+        setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fromDate, toDate, reloadTick]);
 
   const categories = useMemo(() => {
     const unique = Array.from(new Set(machines.map((m) => m.category)));
@@ -212,13 +231,24 @@ export default function CatalogPage() {
           {loading ? (
             <div className="space-y-4">
               <p className="text-sm text-zinc-400 text-center sm:text-left">
-                Budzimy API na Renderze — pierwsze ładowanie po przerwie może potrwać 20–60 s.
+                {t(locale, "apiWaking")}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {[1, 2, 3, 4, 5, 6].map((n) => (
                   <div key={n} className="h-72 rounded-3xl skeleton" />
                 ))}
               </div>
+            </div>
+          ) : loadError ? (
+            <div className="py-16 text-center space-y-4">
+              <p className="text-sm text-zinc-400 max-w-md mx-auto">{t(locale, "apiLoadFail")}</p>
+              <button
+                type="button"
+                onClick={() => setReloadTick((n) => n + 1)}
+                className="inline-flex bg-brand hover:bg-brand-soft text-black font-semibold px-5 py-2.5 rounded-full text-sm"
+              >
+                {t(locale, "apiRetry")}
+              </button>
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-sm text-zinc-400 py-16 text-center">{t(locale, "noResults")}</p>
